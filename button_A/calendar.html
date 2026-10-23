@@ -25,10 +25,19 @@ App.register('calendar', {
       const upcoming = meetings.filter((m) => !m.date || m.date >= today);
       const past = meetings.filter((m) => m.date && m.date < today).reverse().slice(0, 12);
 
-      const checkinButton = (m) => (m.open && !m.attended)
-        ? h('button', { class: 'btn', type: 'button', text: 'ไปลงชื่อเข้าร่วม',
-          onclick: () => App.go('checkin', { meetingId: m.id }) })
-        : null;
+      const checkinButton = (m) => {
+        if (m.open && !m.attended) {
+          return h('button', { class: 'btn', type: 'button', text: 'ไปลงชื่อเข้าร่วม',
+            onclick: () => App.go('checkin', { meetingId: m.id }) });
+        }
+        // ยังไม่ถึงวันประชุม: ไปหน้าลงชื่อเพื่อเปิด/ปิดแจ้งเตือน
+        if (m.early) {
+          return h('button', { class: 'btn btn-ghost', type: 'button',
+            text: m.remind ? 'เปิดแจ้งเตือนไว้แล้ว' : 'ตั้งแจ้งเตือนก่อนวันประชุม',
+            onclick: () => App.go('checkin', { meetingId: m.id }) });
+        }
+        return null;
+      };
 
       fill(body, 
         h('h2', { text: 'กำหนดการที่จะถึง' }),

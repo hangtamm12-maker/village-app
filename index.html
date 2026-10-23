@@ -14,6 +14,9 @@
   <header class="hello" id="hello" hidden>
     <img id="hello-pic" alt="">
     <div><span>สวัสดีครับ</span><strong id="hello-name"></strong></div>
+    <button class="gear" id="btn-admin" type="button" data-go="admin" aria-label="สำหรับผู้ดูแล" title="สำหรับผู้ดูแล" hidden>
+      <svg data-icon="gear"></svg>
+    </button>
   </header>
 
   <div class="status info" id="friend-notice" hidden>
@@ -68,6 +71,7 @@ const PAGE_FILES = [
   'button_A/checkin.html',
   'button_A/profile.html',
   'button_A/accounts.html',
+  'button_A/admin.html',
   'button_B/news.html',
   'button_C/emergency.html',
   'button_D/contact.html',
@@ -192,6 +196,7 @@ function returnUrl(target) {
   if (profile.picture) $('hello-pic').src = profile.picture;
   else $('hello-pic').hidden = true;
   $('hello').hidden = false;
+  $('btn-admin').hidden = !App.isAdmin();
   if (oa) liff.getFriendship().then((f) => { $('friend-notice').hidden = f.friendFlag; }).catch(() => {});
 
   if (!App.me || App.me.status === STATUS.REJECTED) {

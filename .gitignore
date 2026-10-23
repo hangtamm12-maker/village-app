@@ -4,3 +4,6 @@ gscript/
 
 FLOW.md
 mockup/
+
+# ทดสอบ (ใช้ไฟล์ .gs ในเครื่อง) ไม่ขึ้น GitHub Pages
+tests/

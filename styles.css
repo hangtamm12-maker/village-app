@@ -325,3 +325,12 @@ i.t-pipe { background: var(--pipe); }
 .qr-dialog h2 { margin: 0 0 4px; }
 .qr-box { margin: 12px 0; padding: 8px; border-radius: 12px; background: #fff; }
 .qr-box svg { display: block; width: 100%; height: auto; }
+
+/* ปุ่มฟันเฟือง (ผู้ดูแล) มุมบนขวา */
+.gear {
+  margin-left: auto; width: 44px; height: 44px; padding: 10px; flex: none;
+  border: 1px solid var(--line); border-radius: 50%; background: var(--surface); color: var(--muted); cursor: pointer;
+}
+.gear svg { display: block; width: 100%; height: 100%; }
+.gear:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.calls b.count { font-size: 14px; padding: 2px 10px; border-radius: 999px; background: var(--wait-bg); color: var(--wait); }

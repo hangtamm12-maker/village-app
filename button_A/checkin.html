@@ -56,7 +56,7 @@ App.register('checkin', {
     const body = $('checkin-body');
     const msg = $('checkin-msg');
     const wantedId = params.meetingId || '';
-    const isAdmin = !!App.me && App.me.role === 'admin';
+    const isAdmin = App.isAdmin();
     const buttons = {};
 
     const scan = $('checkin-scan');
@@ -79,9 +79,10 @@ App.register('checkin', {
 
     function render(r, justCheckedIn) {
       const meetings = r.meetings || [];
+      // ไม่ระบุประชุม: แสดงที่เปิดลงชื่อวันนี้ + ที่กำลังจะมาถึง (ตั้งแจ้งเตือนได้)
       const list = wantedId
         ? meetings.filter((m) => m.id === wantedId)
-        : meetings.filter((m) => m.open);
+        : meetings.filter((m) => m.open || m.early);
 
       const plate = h('div', { class: 'plate' }, h('div', { class: 'plate-inner' },
         h('div', { class: 'plate-label', text: 'ลงชื่อในนามบ้านเลขที่' }),
@@ -98,7 +99,7 @@ App.register('checkin', {
           wantedId
             ? errorBox('ไม่พบการประชุมตาม QR code นี้ กรุณาสอบถามผู้ดูแล')
             : h('div', { class: 'card empty' },
-              h('p', { text: 'ขณะนี้ยังไม่มีการประชุมที่เปิดให้ลงชื่อ' }),
+              h('p', { text: 'ขณะนี้ยังไม่มีการประชุมที่เปิดให้ลงชื่อหรือกำลังจะมาถึง' }),
               h('p', { class: 'small', text: 'ผู้ดูแลจะเปิดให้ลงชื่อในวันประชุม' })),
           h('button', { class: 'btn btn-ghost', type: 'button', 'data-go': 'calendar', text: 'ดูปฏิทินการประชุม' }));
         return;
@@ -107,7 +108,8 @@ App.register('checkin', {
       fill(body, banner, plate, list.map((m) => meetingCard(m, {
         hideDetail: true,
         action: h('div', {}, actionFor(m),
-          isAdmin && m.open
+          // ผู้ดูแลเปิด QR ได้ตั้งแต่ก่อนวันประชุม (พิมพ์ติดไว้ล่วงหน้าได้)
+          isAdmin && (m.open || m.early)
             ? h('button', { class: 'btn btn-ghost', type: 'button', text: 'แสดง QR ให้ลูกบ้านสแกน', onclick: () => showQr(m) })
             : null),
       })));
@@ -122,6 +124,7 @@ App.register('checkin', {
         return h('div', { class: 'status wait', style: 'margin:14px 0 0' },
           h('p', { text: 'การประชุมนี้ผ่านไปแล้ว ลงชื่อย้อนหลังไม่ได้' }));
       }
+      if (m.early) return reminderBox(m);
       if (!m.open) {
         return h('div', { class: 'status wait', style: 'margin:14px 0 0' },
           h('p', { text: 'การประชุมนี้ยังไม่เปิดให้ลงชื่อ หรือปิดลงชื่อแล้ว' }));
@@ -143,6 +146,35 @@ App.register('checkin', {
         }
       });
       return h('div', {}, btn, err);
+    }
+
+    /** ยังไม่ถึงวันประชุม: ลงชื่อไม่ได้ แต่เปิด/ปิดแจ้งเตือนทาง LINE ได้ (ค่าเริ่มต้นปิด) */
+    function reminderBox(m) {
+      const err = h('div', { class: 'err' });
+      const btn = h('button', {
+        class: 'btn btn-ghost',
+        type: 'button',
+        'aria-pressed': String(!!m.remind),
+        text: m.remind ? 'ปิดการแจ้งเตือน' : 'เปิดแจ้งเตือนก่อนวันประชุม',
+      });
+      btn.addEventListener('click', async () => {
+        btn.disabled = true;
+        err.textContent = '';
+        try {
+          render(await App.api('remind', { meetingId: m.id, on: !m.remind }), null);
+        } catch (e) {
+          err.textContent = e.message;
+          btn.disabled = false;
+        }
+      });
+      return h('div', {},
+        h('div', { class: 'status wait', style: 'margin:14px 0 0' },
+          h('p', { text: `ยังไม่ถึงวันประชุม ลงชื่อได้ใน${fmtDateLong(m.date)}` })),
+        btn,
+        h('p', { class: 'small muted', style: 'margin:8px 0 0', text: m.remind
+          ? 'เปิดแจ้งเตือนแล้ว จะส่งข้อความ LINE เตือนในช่วงเย็นของวันก่อนประชุม'
+          : 'กดเพื่อรับข้อความ LINE เตือนในช่วงเย็นของวันก่อนประชุม' }),
+        err);
     }
 
     function canScan() {
