@@ -68,7 +68,9 @@ const PAGE_FILES = [
   'button_A/checkin.html',
   'button_A/profile.html',
   'button_A/accounts.html',
+  'button_B/news.html',
   'button_C/emergency.html',
+  'button_D/contact.html',
 ];
 
 /** โหลดไฟล์หน้า (<section> + <script>) มาต่อใน <main> ตามลำดับ แล้วให้ <script> ในไฟล์ทำงาน */
@@ -197,7 +199,8 @@ function returnUrl(target) {
     return;
   }
   await sosReady;
-  if (target.page && App.pages[target.page]) App.go(target.page, { meetingId: target.m });
+  // qr: เปิดจากลิงก์ที่มี m= (QR ลงชื่อประชุม) — หน้าลงชื่อจะลงชื่อให้ทันที
+  if (target.page && App.pages[target.page]) App.go(target.page, { meetingId: target.m, qr: !!target.m });
   else App.go('menu');
 })();
 </script>

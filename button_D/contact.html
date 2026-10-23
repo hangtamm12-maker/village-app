@@ -1,0 +1,41 @@
+<section id="page-contact" hidden>
+  <h1>ติดต่อแม่หลวง/ผู้ดูแลระบบ</h1>
+
+  <h2>แชทกับแม่หลวง</h2>
+  <p class="lead">ส่งข้อความถึงแม่หลวงและผู้ดูแลระบบผ่านแชท LINE ของหมู่บ้าน ผู้ดูแลจะตอบกลับในแชท</p>
+  <a class="btn btn-line" id="contact-chat" href="#">เปิดแชท</a>
+
+  <h2>โทรหาแม่หลวงและผู้ช่วย</h2>
+  <div id="contact-body"></div>
+
+  <a class="btn btn-ghost" data-close href="#" style="margin-top:28px">กลับไปที่แชท</a>
+</section>
+
+<script>
+App.register('contact', {
+  async enter() {
+    const oa = CONFIG.OA_ID;
+    const chat = $('contact-chat');
+    chat.hidden = !oa;
+    // ข้อความตั้งต้นในช่องพิมพ์ของแชท ผู้ใช้แก้ก่อนกดส่งได้
+    const house = App.me && App.me.houseNo ? ` จากบ้านเลขที่ ${App.me.houseNo}` : '';
+    chat.href = `https://line.me/R/oaMessage/${encodeURIComponent(oa)}/?${encodeURIComponent(`เรียนแม่หลวง${house} `)}`;
+
+    const body = $('contact-body');
+    if (!App.isMember()) {
+      fill(body, h('div', { class: 'status wait' },
+        h('p', { text: 'รายชื่อสำหรับโทรใช้ได้เมื่อผู้ดูแลอนุมัติการลงทะเบียนแล้ว ระหว่างนี้ติดต่อผ่านแชทได้' })));
+      return;
+    }
+    fill(body, loadingBox('กำลังโหลดรายชื่อ…'));
+    try {
+      const res = await App.api('contact');
+      fill(body, res.contacts.length
+        ? callList(res.contacts, true)
+        : h('div', { class: 'empty card', text: 'ยังไม่ได้ใส่เบอร์ผู้ดูแล' }));
+    } catch (err) {
+      fill(body, errorBox(err.message));
+    }
+  },
+});
+</script>

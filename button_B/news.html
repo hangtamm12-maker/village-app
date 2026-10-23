@@ -1,0 +1,47 @@
+<section id="page-news" hidden>
+  <h1>ข่าวสาร/ประชาสัมพันธ์</h1>
+  <p class="lead">ประกาศและข่าวจากหมู่บ้าน แตะที่ข่าวเพื่ออ่านทั้งหมด</p>
+  <div id="news-body"></div>
+  <a class="btn btn-ghost" data-close href="#" style="margin-top:28px">กลับไปที่แชท</a>
+</section>
+
+<script>
+App.register('news', {
+  memberOnly: true,
+
+  async enter(params) {
+    const body = $('news-body');
+    fill(body, loadingBox('กำลังโหลดข่าว…'));
+    let res;
+    try {
+      res = await App.api('news');
+    } catch (err) {
+      fill(body, errorBox(err.message));
+      return;
+    }
+
+    const items = res.news || [];
+    if (!items.length) {
+      fill(body, h('div', { class: 'empty card', text: 'ยังไม่มีข่าวประชาสัมพันธ์' }));
+      return;
+    }
+    // ?page=news&m=<รหัสข่าว> เปิดข่าวนั้นไว้ให้เลย
+    fill(body, items.map((n) => newsCard(n, n.id === params.meetingId)));
+    const opened = body.querySelector('details[open]');
+    if (opened) opened.scrollIntoView({ block: 'start' });
+
+    function newsCard(n, open) {
+      const excerpt = n.body.length > 100 ? n.body.slice(0, 100).trim() + '…' : n.body;
+      return h('details', { class: 'card news', open: open || null },
+        h('summary', {},
+          n.pinned ? h('span', { class: 'badge open', text: 'ปักหมุด' }) : null,
+          h('h3', { text: n.title }),
+          n.date ? h('p', { class: 'muted small', text: fmtDateLong(n.date) }) : null,
+          excerpt ? h('p', { class: 'excerpt', text: excerpt }) : null,
+          h('span', { class: 'more', text: 'อ่านต่อ' })),
+        n.image ? h('img', { src: n.image, alt: n.title, loading: 'lazy' }) : null,
+        n.body ? h('div', { class: 'news-body', text: n.body }) : null);
+    }
+  },
+});
+</script>

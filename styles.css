@@ -287,3 +287,23 @@ tfoot td { font-weight: 600; }
 i.t-pipe { background: var(--pipe); }
 .map.hide-speaker .t-speaker, .map.hide-light .t-light, .map.hide-camera .t-camera, .map.hide-pipe .t-pipe { display: none; }
 .map-info { margin: 8px 0 0; font-size: 15px; color: var(--muted); min-height: 1.6em; }
+
+/* ข่าวสาร (ปุ่ม B) */
+.news summary { list-style: none; cursor: pointer; border-radius: 8px; }
+.news summary::-webkit-details-marker { display: none; }
+.news summary:focus-visible { outline: 3px solid var(--focus); outline-offset: 4px; }
+.news .badge { margin: 0 0 4px; }
+.news h3 { margin: 0 0 2px; font-size: 18px; font-weight: 600; line-height: 1.4; }
+.news .excerpt { margin: 6px 0 0; font-size: 16px; color: var(--muted); }
+.news .more { display: inline-block; margin-top: 6px; color: var(--plate); font-size: 15px; font-weight: 500; }
+.news[open] .excerpt, .news[open] .more { display: none; }
+.news img { display: block; width: 100%; height: auto; margin-top: 12px; border-radius: 8px; }
+.news-body { margin-top: 12px; font-size: 17px; white-space: pre-line; overflow-wrap: anywhere; }
+
+/* QR ลงชื่อประชุม */
+#checkin-scan { margin-bottom: 16px; }
+.qr-dialog { width: min(92vw, 420px); padding: 20px; border: 0; border-radius: 16px; background: var(--surface); color: var(--ink); text-align: center; }
+.qr-dialog::backdrop { background: rgba(0, 0, 0, .6); }
+.qr-dialog h2 { margin: 0 0 4px; }
+.qr-box { margin: 12px 0; padding: 8px; border-radius: 12px; background: #fff; }
+.qr-box svg { display: block; width: 100%; height: auto; }
