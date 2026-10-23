@@ -1,0 +1,105 @@
+<section id="page-admin-report" hidden>
+  <div class="topbar">
+    <button class="back" type="button" data-go="admin"><svg data-icon="back"></svg>สำหรับผู้ดูแล</button>
+  </div>
+  <h1>รายงานการประชุม</h1>
+  <div class="field">
+    <label class="lbl" for="report-meeting">เลือกการประชุม</label>
+    <select id="report-meeting"></select>
+  </div>
+  <div id="report-body"></div>
+</section>
+
+<script>
+App.register('admin-report', {
+  adminOnly: true,
+
+  async enter() {
+    const sel = $('report-meeting');
+    const body = $('report-body');
+    fill(sel);
+    sel.disabled = true;
+    fill(body, loadingBox('กำลังโหลดการประชุม…'));
+
+    let list;
+    try {
+      list = await App.api('adminMeetings');
+    } catch (err) {
+      fill(body, errorBox(err.message));
+      return;
+    }
+    if (!list.meetings.length) {
+      fill(body, h('div', { class: 'empty card', text: 'ยังไม่มีการประชุมในชีต Meetings' }));
+      return;
+    }
+
+    const shortDate = (iso) => {
+      const d = parseIso(iso);
+      return d ? `${d.getDate()} ${TH_MONTHS_SHORT[d.getMonth()]} ${String(d.getFullYear() + 543).slice(-2)}` : 'ไม่ระบุวัน';
+    };
+    fill(sel, list.meetings.map((m) => h('option', { value: m.id,
+      text: `${shortDate(m.date)} · ${m.title} (${m.count}/${list.totalHouses})` })));
+    // ค่าเริ่มต้น: ประชุมวันนี้ ถ้าไม่มีใช้ครั้งล่าสุดที่ผ่านมา
+    const def = list.meetings.find((m) => m.date === list.today)
+      || list.meetings.find((m) => m.date && m.date < list.today)
+      || list.meetings[0];
+    sel.value = def.id;
+    sel.disabled = false;
+    sel.onchange = () => load(sel.value);
+    load(def.id);
+
+    async function load(id) {
+      fill(body, loadingBox('กำลังสรุปรายงาน…'));
+      try {
+        show(await App.api('adminReport', { meetingId: id }));
+      } catch (err) {
+        fill(body, errorBox(err.message));
+      }
+    }
+
+    function show(r) {
+      const n = r.attended.length;
+      const total = r.totalHouses;
+      const pct = total ? Math.round((n / total) * 100) : 0;
+
+      const exportMsg = h('div');
+      const exportBtn = h('button', { class: 'btn', type: 'button', text: 'ส่งออกเป็น Google Sheets' });
+      exportBtn.addEventListener('click', async () => {
+        exportBtn.disabled = true;
+        exportBtn.textContent = 'กำลังสร้างรายงาน…';
+        try {
+          const x = await App.api('adminExport', { meetingId: r.meeting.id });
+          fill(exportMsg, h('div', { class: 'status ok', style: 'margin-top:12px' },
+            h('p', { text: `สร้างแท็บ "${x.sheetName}" แล้ว เปิดแล้วดาวน์โหลดเป็น PDF หรือ Excel ได้จากเมนู ไฟล์ → ดาวน์โหลด` }),
+            h('a', { class: 'btn btn-ghost', style: 'margin-top:12px', href: x.url, target: '_blank', rel: 'noopener', text: 'เปิดรายงาน' })));
+        } catch (err) {
+          fill(exportMsg, errorBox(err.message));
+        }
+        exportBtn.disabled = false;
+        exportBtn.textContent = 'ส่งออกเป็น Google Sheets';
+      });
+
+      fill(body,
+        h('div', { class: 'summary' },
+          h('div', { class: 'wide' }, h('span', { text: 'บ้านที่ลงชื่อเข้าร่วม' }), h('b', { text: `${n} / ${total} หลัง (${pct}%)` })),
+          h('div', {}, h('span', { text: 'ลงชื่อแล้ว' }), h('b', { class: 'in', text: n })),
+          h('div', {}, h('span', { text: 'ยังไม่ลงชื่อ' }), h('b', { class: 'out', text: r.absent.length }))),
+        h('div', { class: 'bar in', role: 'img', 'aria-label': `ลงชื่อแล้ว ${pct}%`, style: 'margin:4px 0 16px' },
+          h('i', { style: `width:${pct}%` })),
+        exportBtn,
+        exportMsg,
+        h('h2', { text: `ลงชื่อแล้ว (${n})` }),
+        n
+          ? h('div', { class: 'table-wrap report' }, h('table', {},
+            h('thead', {}, h('tr', {}, ['บ้านเลขที่', 'ผู้ลงชื่อ', 'เวลา', 'วิธี'].map((t) => h('th', { text: t })))),
+            h('tbody', {}, r.attended.map((a) => h('tr', {},
+              h('td', { text: a.houseNo }), h('td', { text: a.name }), h('td', { text: a.time }), h('td', { text: a.method }))))))
+          : h('div', { class: 'empty card', text: 'ยังไม่มีบ้านลงชื่อ' }),
+        h('h2', { text: `ยังไม่ลงชื่อ (${r.absent.length})` }),
+        r.absent.length
+          ? h('p', { class: 'absent', text: r.absent.join(', ') })
+          : h('div', { class: 'empty card', text: total ? 'ลงชื่อครบทุกบ้านแล้ว' : 'ยังไม่มีรายชื่อบ้านในชีต Houses' }));
+    }
+  },
+});
+</script>

@@ -1,0 +1,74 @@
+<section id="page-admin-approve" hidden>
+  <div class="topbar">
+    <button class="back" type="button" data-go="admin"><svg data-icon="back"></svg>สำหรับผู้ดูแล</button>
+  </div>
+  <h1>อนุมัติลูกบ้าน</h1>
+  <p class="lead">อนุมัติแล้วระบบเปลี่ยนเมนู LINE ของผู้นั้นเป็นเมนูลูกบ้านให้ทันที</p>
+  <div id="approve-msg" role="status"></div>
+  <div id="approve-body"></div>
+</section>
+
+<script>
+App.register('admin-approve', {
+  adminOnly: true,
+
+  async enter() {
+    const body = $('approve-body');
+    const msg = $('approve-msg');
+    fill(msg);
+    fill(body, loadingBox('กำลังโหลดรายชื่อ…'));
+    try {
+      render(await App.api('adminPending'));
+    } catch (err) {
+      fill(body, errorBox(err.message));
+    }
+
+    function render(res) {
+      const users = res.users || [];
+      if (!users.length) {
+        fill(body, h('div', { class: 'empty card' },
+          h('p', { text: 'ไม่มีลูกบ้านที่รออนุมัติ' }),
+          res.requireApproval ? null : h('p', { class: 'small',
+            text: 'ตอนนี้ระบบอนุมัติการลงทะเบียนให้อัตโนมัติ (Script Property REQUIRE_APPROVAL ไม่ได้ตั้งเป็น true)' })));
+        return;
+      }
+      fill(body, h('p', { class: 'muted', text: `รออนุมัติ ${users.length} คน` }), users.map((u) => card(u, res.labels)));
+    }
+
+    function card(u, labels) {
+      const err = h('div', { class: 'err' });
+      const approve = h('button', { class: 'btn', type: 'button', text: 'อนุมัติ' });
+      const reject = h('button', { class: 'btn btn-ghost btn-danger', type: 'button', text: 'ไม่อนุมัติ' });
+      const who = `${u.name} (บ้านเลขที่ ${u.houseNo || '-'})`;
+
+      async function act(status) {
+        if (status === STATUS.REJECTED && !confirm(`ไม่อนุมัติ ${who} ใช่ไหม`)) return;
+        approve.disabled = true;
+        reject.disabled = true;
+        err.textContent = '';
+        try {
+          render(await App.api('adminSetStatus', { userId: u.userId, status }));
+          fill(msg, h('div', { class: 'status ok' }, h('p', { text: `${status === STATUS.APPROVED ? 'อนุมัติ' : 'ไม่อนุมัติ'} ${who} แล้ว` })));
+          window.scrollTo(0, 0);
+        } catch (e) {
+          err.textContent = e.message;
+          approve.disabled = false;
+          reject.disabled = false;
+        }
+      }
+      approve.addEventListener('click', () => act(STATUS.APPROVED));
+      reject.addEventListener('click', () => act(STATUS.REJECTED));
+
+      const shown = labels.filter((l) => u.values[l]);
+      return h('div', { class: 'card' },
+        h('h3', { class: 'inc-title', text: u.name }),
+        h('p', { class: 'muted small', text: `ชื่อ LINE: ${u.lineName}${u.created ? ` · ลงทะเบียน ${u.created}` : ''}` }),
+        shown.length
+          ? h('dl', { class: 'details', style: 'margin:12px 0' }, shown.map((l) => h('div', {}, h('dt', { text: l }), h('dd', { text: u.values[l] }))))
+          : null,
+        h('div', { class: 'row-btns' }, approve, reject),
+        err);
+    }
+  },
+});
+</script>

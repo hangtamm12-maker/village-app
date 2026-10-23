@@ -334,3 +334,11 @@ i.t-pipe { background: var(--pipe); }
 .gear svg { display: block; width: 100%; height: 100%; }
 .gear:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
 .calls b.count { font-size: 14px; padding: 2px 10px; border-radius: 999px; background: var(--wait-bg); color: var(--wait); }
+
+/* หน้าผู้ดูแล */
+.tile .badge { margin-top: auto; }
+.row-btns { display: flex; gap: 10px; margin-top: 4px; }
+.row-btns .btn { flex: 1; margin-top: 0; }
+.btn-danger { color: var(--bad); border-color: var(--bad); }
+.report th, .report td { text-align: left; white-space: normal; }
+.absent { margin: 0; padding: 14px 16px; background: var(--surface); border: 1px solid var(--line); border-radius: 16px; line-height: 1.9; overflow-wrap: anywhere; }

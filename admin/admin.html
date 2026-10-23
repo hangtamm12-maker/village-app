@@ -5,10 +5,26 @@
   <h1>สำหรับผู้ดูแล</h1>
   <p class="lead">เมนูนี้แสดงเฉพาะผู้ที่มี role เป็น admin</p>
 
-  <h2>วันประชุม</h2>
-  <button class="btn" type="button" data-go="checkin">แสดง QR ลงชื่อประชุม</button>
+  <div class="tiles">
+    <button class="tile" type="button" data-go="admin-approve">
+      <svg data-icon="userCheck"></svg>
+      <strong>อนุมัติลูกบ้าน</strong>
+      <span>ตรวจข้อมูลและอนุมัติการลงทะเบียน</span>
+      <span class="badge open" id="admin-pending" hidden></span>
+    </button>
+    <button class="tile" type="button" data-go="admin-report">
+      <svg data-icon="chart"></svg>
+      <strong>รายงานการประชุม</strong>
+      <span>จำนวนบ้านที่เข้าร่วม และส่งออกรายงาน</span>
+    </button>
+    <button class="tile" type="button" data-go="checkin">
+      <svg data-icon="qr"></svg>
+      <strong>QR ลงชื่อประชุม</strong>
+      <span>เปิด QR ให้ลูกบ้านสแกนที่หน้างาน</span>
+    </button>
+  </div>
 
-  <h2>แก้ไขข้อมูลใน Google Sheets</h2>
+  <h2>แก้ไขข้อมูลอื่นใน Google Sheets</h2>
   <p class="muted small">เปิดด้วยบัญชี Google ที่ได้รับสิทธิ์แก้ไขชีตของหมู่บ้าน</p>
   <div id="admin-body"></div>
 </section>
@@ -19,9 +35,12 @@ App.register('admin', {
 
   async enter() {
     const body = $('admin-body');
+    const pending = $('admin-pending');
     fill(body, loadingBox('กำลังโหลด…'));
     try {
       const res = await App.api('admin');
+      pending.textContent = `รออนุมัติ ${res.pending}`;
+      pending.hidden = !res.pending;
       fill(body, h('ul', { class: 'calls' }, res.sheets.map((s) => h('li', {},
         h('a', { href: s.url, target: '_blank', rel: 'noopener' },
           icon('sheet'),
