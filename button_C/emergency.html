@@ -1,0 +1,240 @@
+<section id="page-emergency" hidden>
+  <div class="tabs" role="tablist" aria-label="แจ้งเหตุ">
+    <button type="button" role="tab" aria-controls="em-sos">แจ้งเหตุฉุกเฉิน</button>
+    <button type="button" role="tab" aria-controls="em-report">แจ้งเหตุ/แจ้งซ่อม</button>
+    <button type="button" role="tab" aria-controls="em-track">ติดตามสถานะ</button>
+  </div>
+
+  <div role="tabpanel" id="em-sos">
+    <p class="lead">กดที่รายชื่อเพื่อโทรออกได้ทันที</p>
+    <h2>หน่วยงานภายนอก</h2>
+    <div id="em-outer"></div>
+    <h2>แม่หลวงและผู้ช่วย</h2>
+    <div id="em-inner"></div>
+  </div>
+  <div role="tabpanel" id="em-report" hidden></div>
+  <div role="tabpanel" id="em-track" hidden></div>
+
+  <a class="btn btn-ghost" data-close href="#" style="margin-top:28px">กลับไปที่แชท</a>
+</section>
+
+<script>
+/** ประเภทหมุดในชีต MapPins → ชื่อไอคอน/คลาสสี */
+const PIN_KEYS = { 'ลำโพง': 'speaker', 'ไฟส่องสว่าง': 'light', 'กล้องวงจรปิด': 'camera', 'ท่อประปา': 'pipe' };
+
+/** ตารางบนแผนผัง: คอลัมน์ A–J, แถว 1–10 */
+const GRID = 10;
+
+/** x,y เป็น % ของแผนผัง → ชื่อช่อง เช่น "A2" */
+function gridCell(x, y) {
+  const c = Math.min(GRID - 1, Math.floor(x / (100 / GRID)));
+  const r = Math.min(GRID - 1, Math.floor(y / (100 / GRID)));
+  return String.fromCharCode(65 + c) + (r + 1);
+}
+
+function emTab(panelId) {
+  document.querySelectorAll('#page-emergency [role=tab]').forEach((t) => {
+    const on = t.getAttribute('aria-controls') === panelId;
+    t.setAttribute('aria-selected', String(on));
+    t.tabIndex = on ? 0 : -1;
+    $(t.getAttribute('aria-controls')).hidden = !on;
+    if (on && document.activeElement && document.activeElement.getAttribute('role') === 'tab') t.focus();
+  });
+}
+
+document.querySelector('#page-emergency [role=tablist]').addEventListener('click', (e) => {
+  const t = e.target.closest('[role=tab]');
+  if (t) emTab(t.getAttribute('aria-controls'));
+});
+
+// ลูกศรซ้าย/ขวาเลื่อนแท็บ (คีย์บอร์ด/โปรแกรมอ่านหน้าจอ)
+document.querySelector('#page-emergency [role=tablist]').addEventListener('keydown', (e) => {
+  if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+  const tabs = [...document.querySelectorAll('#page-emergency [role=tab]')];
+  const i = tabs.indexOf(document.activeElement);
+  if (i < 0) return;
+  const next = tabs[(i + (e.key === 'ArrowRight' ? 1 : tabs.length - 1)) % tabs.length];
+  emTab(next.getAttribute('aria-controls'));
+});
+
+App.register('emergency', {
+  async enter() {
+    emTab('em-sos');
+    const sos = BOOT.sos || [];
+    fill($('em-outer'), sos.length ? callList(sos) : h('div', { class: 'empty card', text: 'ยังไม่ได้ใส่เบอร์ฉุกเฉิน' }));
+
+    const panels = [$('em-inner'), $('em-report'), $('em-track')];
+    if (!App.isMember()) {
+      panels.forEach((p) => fill(p, h('div', { class: 'status wait' },
+        h('p', { text: 'ส่วนนี้ใช้ได้เมื่อผู้ดูแลอนุมัติการลงทะเบียนแล้ว' }))));
+      return;
+    }
+
+    panels.forEach((p) => fill(p, loadingBox('กำลังโหลดข้อมูล…')));
+    let data;
+    try {
+      data = await App.api('emergency');
+    } catch (err) {
+      panels.forEach((p) => fill(p, errorBox(err.message)));
+      return;
+    }
+
+    fill($('em-inner'), data.inner.length
+      ? callList(data.inner, true)
+      : h('div', { class: 'empty card', text: 'ยังไม่ได้ใส่เบอร์ผู้ดูแล' }));
+    fill($('em-report'), reportForm());
+    renderList(data.incidents, '');
+
+    function field(id, label, input, required) {
+      return h('div', { class: 'field' },
+        h('label', { class: 'lbl', for: id }, label, required ? h('span', { class: 'req', text: ' *' }) : null),
+        input);
+    }
+
+    function reportForm() {
+      const type = h('select', { id: 'em-type' },
+        h('option', { value: '', text: 'เลือกประเภท' }),
+        data.types.map((t) => h('option', { value: t, text: t })));
+      const detail = h('textarea', { id: 'em-detail', maxlength: 1000 });
+      const place = h('input', { id: 'em-place', type: 'text', maxlength: 150, placeholder: 'เช่น หน้าบ้านเลขที่ 12 ซอย 3' });
+      const err = h('div', { class: 'form-error', role: 'alert' });
+      const btn = h('button', { class: 'btn', type: 'submit', text: 'ส่งเรื่อง' });
+      let point = '';
+      const mapEl = villageMap(data.map, data.isAdmin, (label) => { point = label; });
+      const form = h('form', { novalidate: true },
+        h('div', { class: 'status bad' },
+          h('p', { text: 'เหตุอันตรายต่อชีวิตหรือทรัพย์สิน กรุณาโทรจากแท็บ "แจ้งเหตุฉุกเฉิน" ทันที' })),
+        field('em-type', 'ประเภท', type, true),
+        field('em-detail', 'รายละเอียด', detail, true),
+        mapEl ? h('div', { class: 'field' }, h('span', { class: 'lbl', text: 'ตำแหน่งบนแผนผังหมู่บ้าน' }), mapEl) : null,
+        field('em-place', 'รายละเอียดสถานที่เพิ่มเติม', place, false),
+        err, btn);
+
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        btn.disabled = true;
+        btn.textContent = 'กำลังส่ง…';
+        err.textContent = '';
+        try {
+          const res = await App.api('report', {
+            type: type.value,
+            detail: detail.value,
+            place: [point, place.value.trim()].filter(Boolean).join(' · '),
+          });
+          fill($('em-report'), reportForm());
+          renderList(res.incidents, 'ส่งเรื่องเรียบร้อย ผู้ดูแลได้รับแจ้งแล้ว');
+          emTab('em-track');
+          window.scrollTo(0, 0);
+        } catch (ex) {
+          err.textContent = ex.message;
+        }
+        btn.disabled = false;
+        btn.textContent = 'ส่งเรื่อง';
+      });
+      return form;
+    }
+
+    function renderList(items, okMessage) {
+      fill($('em-track'),
+        okMessage ? h('div', { class: 'status ok', role: 'status' }, h('p', { text: okMessage })) : null,
+        items.length ? items.map(incidentCard) : h('div', { class: 'empty card', text: 'ยังไม่มีเรื่องที่แจ้ง' }));
+    }
+
+    function incidentCard(i) {
+      const step = Math.max(0, data.statuses.indexOf(i.status));
+      const d = parseIso(i.date);
+      const when = d ? `${d.getDate()} ${TH_MONTHS_SHORT[d.getMonth()]} ${d.getFullYear() + 543}` : '';
+      return h('div', { class: 'card' },
+        h('h3', { class: 'inc-title', text: i.type }),
+        h('p', { class: 'muted small', text: `${i.id} · ${when}${i.time ? ` ${i.time} น.` : ''}` }),
+        h('p', { class: 'inc-detail', text: i.detail }),
+        i.place ? h('p', { class: 'muted small', text: 'สถานที่: ' + i.place }) : null,
+        h('ol', { class: 'steps', 'aria-label': 'สถานะ: ' + i.status },
+          data.statuses.map((s, n) => h('li', {
+            class: n <= step ? 'done s' + n : null,
+            'aria-current': n === step ? 'step' : null,
+            text: s,
+          }))),
+        i.note ? h('p', { class: 'small', text: 'หมายเหตุจากผู้ดูแล: ' + i.note }) : null);
+    }
+
+    /** แผนผังในฟอร์มแจ้งเรื่อง: แตะเพื่อเลือกช่อง (เช่น จุด A2) หรือแตะหมุดอุปกรณ์ แล้วส่งค่าให้ onPick */
+    function villageMap(map, isAdmin, onPick) {
+      if (!map.image && !map.pins.length) return null;
+      const hint = 'แตะบนแผนผังหรือแตะหมุดอุปกรณ์เพื่อระบุตำแหน่งที่เกิดเหตุ';
+      const info = h('p', { class: 'map-info', 'aria-live': 'polite', text: hint });
+      const box = h('div', { class: 'map' + (map.image ? '' : ' blank') });
+      if (map.image) box.append(h('img', { src: map.image, alt: 'แผนผังหมู่บ้าน' }));
+
+      // เส้นตาราง + แนวท่อประปา พิกัดเป็นตัวเลขที่หลังบ้านตรวจแล้ว
+      let lines = '';
+      for (let i = 1; i < GRID; i++) {
+        const v = i * 100 / GRID;
+        lines += `<line x1="${v}" y1="0" x2="${v}" y2="100"/><line x1="0" y1="${v}" x2="100" y2="${v}"/>`;
+      }
+      const pipes = map.pins.filter((p) => p.type === 'ท่อประปา' && p.points.length > 1);
+      const t = document.createElement('template');
+      t.innerHTML = '<svg class="overlay" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">' +
+        `<g class="grid">${lines}</g><g class="t-pipe">` +
+        pipes.map((p) => `<polyline points="${p.points.map((xy) => xy.join(',')).join(' ')}"/>`).join('') + '</g></svg>';
+      box.append(t.content.firstChild);
+      for (let i = 0; i < GRID; i++) {
+        const mid = (i + 0.5) * 100 / GRID;
+        box.append(h('span', { class: 'gl col', style: `left:${mid}%`, text: String.fromCharCode(65 + i) }),
+          h('span', { class: 'gl row', style: `top:${mid}%`, text: i + 1 }));
+      }
+
+      const mark = h('div', { class: 'mark', hidden: true });
+      const clear = h('button', { class: 'btn btn-ghost', type: 'button', text: 'ล้างตำแหน่งที่เลือก', hidden: true });
+
+      function select(x, y, pin) {
+        const label = 'จุด ' + gridCell(x, y) + (pin ? ` (${pin.type} ${pin.name})` : '');
+        mark.style.left = x + '%';
+        mark.style.top = y + '%';
+        mark.hidden = false;
+        clear.hidden = false;
+        // ผู้ดูแลเห็นค่า x,y ด้วย สำหรับใส่ในชีต MapPins
+        info.textContent = 'ตำแหน่งที่เลือก: ' + label + (pin && pin.note ? ` · ${pin.note}` : '') +
+          (isAdmin ? ` · x,y = ${x.toFixed(1)},${y.toFixed(1)}` : '');
+        onPick(label);
+      }
+
+      clear.addEventListener('click', () => {
+        mark.hidden = true;
+        clear.hidden = true;
+        info.textContent = hint;
+        onPick('');
+      });
+
+      map.pins.filter((p) => p.type !== 'ท่อประปา').forEach((p) => {
+        const [x, y] = p.points[0];
+        const key = PIN_KEYS[p.type];
+        box.append(h('button', {
+          type: 'button',
+          class: 'pin t-' + key,
+          style: `left:${x}%;top:${y}%`,
+          'aria-label': `${p.type} ${p.name} จุด ${gridCell(x, y)}`,
+          onclick: (e) => {
+            e.stopPropagation();
+            select(x, y, p);
+          },
+        }, icon(key)));
+      });
+      box.append(mark);
+
+      box.addEventListener('click', (e) => {
+        const r = box.getBoundingClientRect();
+        select((e.clientX - r.left) / r.width * 100, (e.clientY - r.top) / r.height * 100, null);
+      });
+
+      const legend = h('div', { class: 'legend' }, map.types.map((type) => {
+        const key = PIN_KEYS[type];
+        const cb = h('input', { type: 'checkbox', checked: true });
+        cb.addEventListener('change', () => box.classList.toggle('hide-' + key, !cb.checked));
+        return h('label', {}, cb, h('i', { class: 't-' + key }), type);
+      }));
+      return h('div', {}, legend, box, info, clear);
+    }
+  },
+});
+</script>

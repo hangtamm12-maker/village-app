@@ -1,0 +1,44 @@
+<section id="page-calendar" hidden>
+  <div class="topbar">
+    <button class="back" type="button" data-go="menu"><svg data-icon="back"></svg>เมนูหลัก</button>
+  </div>
+  <h1>ปฏิทินการประชุม</h1>
+  <div id="cal-body"></div>
+</section>
+
+<script>
+App.register('calendar', {
+  memberOnly: true,
+
+  async enter() {
+    const body = $('cal-body');
+    fill(body, loadingBox('กำลังโหลดกำหนดการ…'));
+    try {
+      const res = await App.api('meetings');
+      render(res.meetings || []);
+    } catch (err) {
+      fill(body, errorBox(err.message));
+    }
+
+    function render(meetings) {
+      const today = todayIso();
+      const upcoming = meetings.filter((m) => !m.date || m.date >= today);
+      const past = meetings.filter((m) => m.date && m.date < today).reverse().slice(0, 12);
+
+      const checkinButton = (m) => (m.open && !m.attended)
+        ? h('button', { class: 'btn', type: 'button', text: 'ไปลงชื่อเข้าร่วม',
+          onclick: () => App.go('checkin', { meetingId: m.id }) })
+        : null;
+
+      fill(body, 
+        h('h2', { text: 'กำหนดการที่จะถึง' }),
+        upcoming.length
+          ? upcoming.map((m) => meetingCard(m, { action: checkinButton(m) }))
+          : h('div', { class: 'empty card', text: 'ยังไม่มีกำหนดการประชุมครั้งถัดไป' }),
+        past.length ? h('h2', { text: 'การประชุมที่ผ่านมา' }) : null,
+        past.map((m) => meetingCard(m, { past: true })),
+      );
+    }
+  },
+});
+</script>

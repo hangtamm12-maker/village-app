@@ -1,0 +1,85 @@
+<section id="page-accounts" hidden>
+  <div class="topbar">
+    <button class="back" type="button" data-go="menu"><svg data-icon="back"></svg>เมนูหลัก</button>
+  </div>
+  <h1>รายงานบัญชีหมู่บ้าน</h1>
+  <div class="field" id="acc-year-field" hidden>
+    <label class="lbl" for="acc-year">ปีบัญชี</label>
+    <select id="acc-year"></select>
+  </div>
+  <div id="acc-body"></div>
+</section>
+
+<script>
+(function () {
+  let requestNo = 0;
+
+  App.register('accounts', {
+    memberOnly: true,
+    enter() { load(); },
+  });
+
+  $('acc-year').addEventListener('change', (e) => load(e.target.value));
+
+  async function load(year) {
+    const no = ++requestNo;
+    const body = $('acc-body');
+    fill(body, loadingBox('กำลังสรุปยอดบัญชี…'));
+    try {
+      const res = await App.api('accounts', { year: year ? Number(year) : null });
+      if (no !== requestNo) return; // ผู้ใช้เปลี่ยนปีระหว่างโหลด
+      render(res);
+    } catch (err) {
+      if (no === requestNo) fill(body, errorBox(err.message));
+    }
+  }
+
+  function render(res) {
+    const select = $('acc-year');
+    select.replaceChildren(...res.years.map((y) =>
+      h('option', { value: y, selected: y === res.year, text: `พ.ศ. ${y + 543}` })));
+    $('acc-year-field').hidden = false;
+
+    const t = res.totals;
+    const thisYear = new Date().getFullYear();
+    const shownMonths = res.months.filter((m) => m.income || m.expense);
+
+    const catList = (items, total, cls) => items.length
+      ? h('ul', { class: 'cats' }, items.map((c) => h('li', {},
+        h('div', { class: 'row' }, h('span', { text: c.name }), h('b', { text: money(c.total) })),
+        h('div', { class: 'bar ' + cls }, h('i', { style: `width:${total ? Math.max(2, (c.total / total) * 100) : 0}%` })))))
+      : h('p', { class: 'muted small', text: 'ไม่มีรายการในปีนี้' });
+
+    fill($('acc-body'), 
+      h('div', { class: 'summary' },
+        h('div', { class: 'wide' },
+          h('span', { text: res.year === thisYear ? 'เงินคงเหลือปัจจุบัน (บาท)' : `เงินคงเหลือสิ้นปี ${res.year + 543} (บาท)` }),
+          h('b', { text: money(t.closing) })),
+        h('div', {}, h('span', { text: 'รายรับทั้งปี' }), h('b', { class: 'in', text: money(t.income) })),
+        h('div', {}, h('span', { text: 'รายจ่ายทั้งปี' }), h('b', { class: 'out', text: money(t.expense) }))),
+      h('p', { class: 'muted small', text: `ยอดยกมาจากปีก่อน ${money(t.opening)} บาท` }),
+
+      h('h2', { text: 'สรุปรายเดือน' }),
+      shownMonths.length
+        ? h('div', { class: 'table-wrap' }, h('table', {},
+          h('thead', {}, h('tr', {}, h('th', { text: 'เดือน' }), h('th', { text: 'รายรับ' }), h('th', { text: 'รายจ่าย' }))),
+          h('tbody', {}, shownMonths.map((m) => h('tr', {},
+            h('td', { text: TH_MONTHS[m.month] }),
+            h('td', { class: 'in', text: m.income ? money(m.income) : '–' }),
+            h('td', { class: 'out', text: m.expense ? money(m.expense) : '–' })))),
+          h('tfoot', {}, h('tr', {},
+            h('td', { text: 'รวม' }),
+            h('td', { class: 'in', text: money(t.income) }),
+            h('td', { class: 'out', text: money(t.expense) })))))
+        : h('div', { class: 'card empty', text: 'ยังไม่มีรายการบัญชีในปีนี้' }),
+
+      h('h2', { text: 'รายรับตามหมวด' }),
+      catList(res.income, t.income, 'in'),
+      h('h2', { text: 'รายจ่ายตามหมวด' }),
+      catList(res.expense, t.expense, 'out'),
+
+      h('p', { class: 'note', text: 'แสดงเฉพาะยอดสรุป หากต้องการดูรายละเอียดหรือหลักฐานการใช้จ่าย กรุณาติดต่อผู้ดูแลหมู่บ้าน' }),
+    );
+  }
+})();
+</script>

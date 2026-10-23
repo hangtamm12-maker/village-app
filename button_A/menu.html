@@ -1,0 +1,67 @@
+<section id="page-menu" hidden>
+  <div class="status" id="menu-banner" hidden>
+    <h2 id="menu-banner-title"></h2>
+    <p id="menu-banner-text"></p>
+  </div>
+
+  <div class="plate" id="menu-plate-wrap"><div class="plate-inner">
+    <div class="plate-label">บ้านเลขที่</div>
+    <div class="plate-no" id="menu-plate"></div>
+  </div></div>
+
+  <div class="tiles">
+    <button class="tile" type="button" data-go="calendar">
+      <svg data-icon="calendar"></svg>
+      <strong>ปฏิทินการประชุม</strong>
+      <span>วัน เวลา และวาระการประชุมของหมู่บ้าน</span>
+    </button>
+    <button class="tile" type="button" data-go="checkin">
+      <svg data-icon="checkin"></svg>
+      <strong>ลงชื่อเข้าร่วมประชุม</strong>
+      <span>ลงชื่อแทนบ้านของคุณในวันประชุม</span>
+    </button>
+    <button class="tile" type="button" data-go="profile">
+      <svg data-icon="home"></svg>
+      <strong>ข้อมูลลูกบ้าน</strong>
+      <span>ข้อมูลของคุณและสมาชิกในบ้าน</span>
+    </button>
+    <button class="tile" type="button" data-go="accounts">
+      <svg data-icon="receipt"></svg>
+      <strong>รายงานบัญชีหมู่บ้าน</strong>
+      <span>สรุปรายรับรายจ่ายรายเดือนและรายปี</span>
+    </button>
+  </div>
+
+  <a class="btn btn-ghost" data-close href="#">กลับไปที่แชท</a>
+</section>
+
+<script>
+App.register('menu', {
+  enter(params) {
+    const member = App.isMember();
+    const banner = $('menu-banner');
+
+    if (params.justRegistered) {
+      banner.className = 'status ' + (member ? 'ok' : 'wait');
+      $('menu-banner-title').textContent = 'ลงทะเบียนเสร็จสิ้น';
+      $('menu-banner-text').textContent = member
+        ? 'ใช้งานเมนูของหมู่บ้านด้านล่างได้เลย'
+        : 'ผู้ดูแลจะตรวจสอบข้อมูล เมื่ออนุมัติแล้วจะใช้งานเมนูด้านล่างได้';
+      banner.hidden = false;
+    } else if (!member) {
+      banner.className = 'status wait';
+      $('menu-banner-title').textContent = 'รอผู้ดูแลอนุมัติ';
+      $('menu-banner-text').textContent = 'ลงทะเบียนเรียบร้อยแล้ว เมื่อผู้ดูแลอนุมัติจะใช้งานเมนูด้านล่างได้';
+      banner.hidden = false;
+    } else {
+      banner.hidden = true;
+    }
+
+    const houseNo = App.me ? App.me.houseNo : '';
+    $('menu-plate-wrap').hidden = !houseNo;
+    setPlate($('menu-plate'), houseNo);
+
+    document.querySelectorAll('#page-menu .tile').forEach((t) => { t.disabled = !member; });
+  },
+});
+</script>

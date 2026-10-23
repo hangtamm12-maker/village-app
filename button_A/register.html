@@ -1,0 +1,195 @@
+<section id="page-register" hidden>
+  <div id="reg-intro">
+    <div class="status info" id="reg-intro-box">
+      <h2 id="reg-intro-title"></h2>
+      <p id="reg-intro-text"></p>
+    </div>
+    <button class="btn" type="button" id="reg-start">ลงทะเบียน</button>
+  </div>
+
+  <form id="reg-form" novalidate hidden>
+    <div class="topbar">
+      <button class="back" type="button" id="reg-back"><svg data-icon="back"></svg>ย้อนกลับ</button>
+    </div>
+    <h1>ลงทะเบียนลูกบ้าน</h1>
+    <p class="lead">กรอกข้อมูลให้ครบ ช่องที่มีเครื่องหมาย <span class="req">*</span> ต้องกรอก</p>
+
+    <div class="plate" id="reg-plate-wrap" aria-hidden="true" hidden><div class="plate-inner">
+      <div class="plate-label">บ้านเลขที่</div>
+      <div class="plate-no empty" id="reg-plate">–</div>
+    </div></div>
+
+    <div id="reg-fields"></div>
+
+    <div class="field">
+      <label class="consent">
+        <input type="checkbox" id="reg-consent">
+        <span>ยินยอมให้หมู่บ้านเก็บข้อมูลข้างต้น เพื่อใช้ติดต่อและให้บริการภายในหมู่บ้านเท่านั้น โดยผู้ดูแลระบบเท่านั้นที่เห็นข้อมูลนี้</span>
+      </label>
+      <div class="err" id="reg-consent-err"></div>
+    </div>
+
+    <div class="form-error" id="reg-error" role="alert"></div>
+    <button class="btn" type="submit" id="reg-submit">ส่งข้อมูลลงทะเบียน</button>
+  </form>
+</section>
+
+<script>
+(function () {
+  let inputs = []; // [{ field, get(), setError(msg) }]
+
+  App.register('register', {
+    enter() {
+      const rejected = App.me && App.me.status === STATUS.REJECTED;
+      $('reg-intro-box').className = 'status ' + (rejected ? 'bad' : 'info');
+      $('reg-intro-title').textContent = rejected
+        ? 'การลงทะเบียนครั้งก่อนยังไม่ได้รับอนุมัติ'
+        : 'ท่านยังไม่เคยลงทะเบียนใช้งานระบบลูกบ้าน';
+      $('reg-intro-text').textContent = rejected
+        ? 'ข้อมูลอาจไม่ตรงกับทะเบียนบ้าน กรุณาตรวจสอบแล้วลงทะเบียนใหม่ หรือติดต่อผู้ดูแลหมู่บ้าน'
+        : 'ลงทะเบียนครั้งเดียว แล้วใช้งานเมนูต่างๆ ของหมู่บ้านได้';
+      $('reg-start').textContent = rejected ? 'ลงทะเบียนใหม่' : 'ลงทะเบียน';
+      $('reg-intro').hidden = false;
+      $('reg-form').hidden = true;
+    },
+  });
+
+  $('reg-start').addEventListener('click', () => {
+    if (!App.fields.length) {
+      $('reg-intro-text').textContent = 'ยังไม่ได้ตั้งค่าฟอร์มลงทะเบียน กรุณาแจ้งผู้ดูแลหมู่บ้าน';
+      return;
+    }
+    buildForm(App.me ? App.me.values : {});
+    $('reg-intro').hidden = true;
+    $('reg-form').hidden = false;
+    window.scrollTo(0, 0);
+  });
+
+  $('reg-back').addEventListener('click', () => App.pages.register.enter());
+
+  function buildForm(prefill) {
+    const box = $('reg-fields');
+    box.replaceChildren();
+    inputs = [];
+    $('reg-plate-wrap').hidden = true;
+
+    App.fields.forEach((f, i) => {
+      const id = 'rf' + i;
+      const value = prefill[f.label] || '';
+      const err = h('div', { class: 'err' });
+      const labelText = [f.label, f.required ? h('span', { class: 'req', text: ' *' }) : null];
+      let wrap;
+      let get;
+      let control = null;
+
+      if (f.type === 'radio') {
+        const choices = h('div', { class: 'choices' }, f.options.map((opt) =>
+          h('label', { class: 'choice' },
+            h('input', { type: 'radio', name: id, value: opt, checked: opt === value }),
+            h('span', { text: opt }))));
+        wrap = h('fieldset', { class: 'field' }, h('legend', {}, labelText), choices);
+        get = () => { const c = choices.querySelector('input:checked'); return c ? c.value : ''; };
+        choices.addEventListener('change', () => { err.textContent = ''; });
+      } else {
+        if (f.type === 'select' || f.type === 'house') {
+          control = h('select', { id },
+            h('option', { value: '', disabled: true, selected: !value, text: 'เลือก' + f.label }),
+            f.options.map((opt) => h('option', { value: opt, selected: opt === value, text: opt })));
+        } else if (f.type === 'textarea') {
+          control = h('textarea', { id, maxlength: 500 });
+          control.value = value;
+        } else {
+          const typeMap = { tel: 'tel', number: 'text', date: 'date' };
+          control = h('input', {
+            id,
+            type: typeMap[f.type] || 'text',
+            inputmode: f.type === 'tel' ? 'numeric' : (f.type === 'number' ? 'decimal' : null),
+            maxlength: f.type === 'tel' ? 12 : 500,
+            autocomplete: f.type === 'tel' ? 'tel' : (f.label.indexOf('ชื่อ') >= 0 ? 'name' : null),
+            placeholder: f.type === 'tel' ? '08x-xxx-xxxx' : null,
+          });
+          control.value = value;
+        }
+        wrap = h('div', { class: 'field' }, h('label', { class: 'lbl', for: id }, labelText), control);
+        get = () => control.value.trim();
+        control.addEventListener('input', () => { err.textContent = ''; control.classList.remove('invalid'); });
+        control.addEventListener('change', () => { err.textContent = ''; control.classList.remove('invalid'); });
+      }
+
+      if (f.type === 'house') {
+        $('reg-plate-wrap').hidden = false;
+        setPlate($('reg-plate'), value);
+        control.addEventListener('change', () => setPlate($('reg-plate'), control.value));
+      }
+
+      if (f.hint) wrap.append(h('span', { class: 'hint', text: f.hint }));
+      wrap.append(err);
+      box.append(wrap);
+
+      inputs.push({
+        field: f,
+        get,
+        focusEl: control || wrap,
+        setError(msg) {
+          err.textContent = msg;
+          if (control) control.classList.toggle('invalid', !!msg);
+        },
+      });
+    });
+
+    $('reg-consent').checked = false;
+    $('reg-consent-err').textContent = '';
+    $('reg-error').textContent = '';
+  }
+
+  function validate() {
+    let first = null;
+    const values = {};
+    inputs.forEach((x) => {
+      const f = x.field;
+      let v = x.get();
+      let msg = '';
+      if (!v && f.required) msg = (f.type === 'radio' || f.type === 'select' || f.type === 'house' ? 'กรุณาเลือก' : 'กรุณากรอก') + f.label;
+      else if (v && f.type === 'tel') {
+        v = v.replace(/\D/g, '');
+        if (!/^0\d{8,9}$/.test(v)) msg = 'กรอกเบอร์โทร 9–10 หลัก ขึ้นต้นด้วย 0';
+      } else if (v && f.type === 'number' && !/^-?\d+(\.\d+)?$/.test(v)) msg = 'กรุณากรอกเป็นตัวเลข';
+      x.setError(msg);
+      if (msg && !first) first = x.focusEl;
+      values[f.label] = v;
+    });
+    const consent = $('reg-consent').checked;
+    $('reg-consent-err').textContent = consent ? '' : 'กรุณากดยินยอมก่อนส่งข้อมูล';
+    if (!consent && !first) first = $('reg-consent');
+    if (first) {
+      first.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      if (first.focus) first.focus({ preventScroll: true });
+      return null;
+    }
+    return { values, consent };
+  }
+
+  $('reg-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    $('reg-error').textContent = '';
+    const data = validate();
+    if (!data) return;
+
+    const btn = $('reg-submit');
+    btn.disabled = true;
+    btn.textContent = 'กำลังส่งข้อมูล…';
+    try {
+      const res = await App.api('register', data);
+      App.me = res.me;
+      App.fields = res.fields;
+      App.go('menu', { justRegistered: true });
+    } catch (err) {
+      $('reg-error').textContent = err.message;
+      $('reg-error').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'ส่งข้อมูลลงทะเบียน';
+    }
+  });
+})();
+</script>

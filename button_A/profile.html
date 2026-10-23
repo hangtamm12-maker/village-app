@@ -1,0 +1,51 @@
+<section id="page-profile" hidden>
+  <div class="topbar">
+    <button class="back" type="button" data-go="menu"><svg data-icon="back"></svg>เมนูหลัก</button>
+  </div>
+  <h1>ข้อมูลลูกบ้าน</h1>
+  <div id="profile-body"></div>
+</section>
+
+<script>
+App.register('profile', {
+  memberOnly: true,
+
+  async enter() {
+    const body = $('profile-body');
+    fill(body, loadingBox('กำลังโหลดข้อมูล…'));
+    try {
+      const res = await App.api('profile');
+      App.me = res.me;
+      render(res);
+    } catch (err) {
+      fill(body, errorBox(err.message));
+    }
+
+    function render(res) {
+      const me = res.me;
+      const rows = (res.fields || [])
+        .filter((f) => f.type !== 'house')
+        .map((f) => {
+          const raw = me.values[f.label] || '';
+          const shown = f.type === 'tel' ? formatPhone(raw) : raw;
+          return h('div', {}, h('dt', { text: f.label }), h('dd', { text: shown || '–' }));
+        });
+
+      const members = res.members || [];
+
+      fill(body, 
+        h('div', { class: 'plate' }, h('div', { class: 'plate-inner' },
+          h('div', { class: 'plate-label', text: 'บ้านเลขที่' }),
+          h('div', { class: 'plate-no', text: me.houseNo || '–' }))),
+        h('h2', { text: 'ข้อมูลของคุณ' }),
+        h('dl', { class: 'details' }, rows,
+          h('div', {}, h('dt', { text: 'สถานะ' }), h('dd', { text: me.status }))),
+        h('h2', { text: `สมาชิกที่ลงทะเบียนในบ้านนี้ (${members.length} คน)` }),
+        h('ul', { class: 'members' }, members.map((m) =>
+          h('li', {}, m.name, m.isMe ? h('em', { text: '(คุณ)' }) : null))),
+        h('p', { class: 'note', text: 'หากต้องการแก้ไขข้อมูล กรุณาติดต่อผู้ดูแลหมู่บ้าน' }),
+      );
+    }
+  },
+});
+</script>

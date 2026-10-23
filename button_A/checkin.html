@@ -1,0 +1,85 @@
+<section id="page-checkin" hidden>
+  <div class="topbar">
+    <button class="back" type="button" data-go="menu"><svg data-icon="back"></svg>เมนูหลัก</button>
+  </div>
+  <h1>ลงชื่อเข้าร่วมประชุม</h1>
+  <p class="lead">ลงชื่อครั้งเดียวต่อบ้าน สมาชิกคนใดในบ้านลงชื่อก็ได้</p>
+  <div id="checkin-body"></div>
+</section>
+
+<script>
+App.register('checkin', {
+  memberOnly: true,
+
+  async enter(params) {
+    const body = $('checkin-body');
+    const wantedId = params.meetingId || '';
+    fill(body, loadingBox('กำลังโหลดการประชุม…'));
+    try {
+      render(await App.api('meetings'), null);
+    } catch (err) {
+      fill(body, errorBox(err.message));
+    }
+
+    function render(res, justCheckedIn) {
+      const meetings = res.meetings || [];
+      const list = wantedId
+        ? meetings.filter((m) => m.id === wantedId)
+        : meetings.filter((m) => m.open);
+
+      const plate = h('div', { class: 'plate' }, h('div', { class: 'plate-inner' },
+        h('div', { class: 'plate-label', text: 'ลงชื่อในนามบ้านเลขที่' }),
+        h('div', { class: 'plate-no', text: res.houseNo || '–' })));
+
+      const banner = justCheckedIn
+        ? h('div', { class: 'status ok' },
+          h('h2', { text: 'ลงชื่อเข้าร่วมประชุมเรียบร้อย' }),
+          h('p', { text: `บันทึกการเข้าร่วมของบ้านเลขที่ ${res.houseNo} แล้ว` }))
+        : null;
+
+      if (!list.length) {
+        fill(body, plate,
+          wantedId
+            ? errorBox('ไม่พบการประชุมตาม QR code นี้ กรุณาสอบถามผู้ดูแล')
+            : h('div', { class: 'card empty' },
+              h('p', { text: 'ขณะนี้ยังไม่มีการประชุมที่เปิดให้ลงชื่อ' }),
+              h('p', { class: 'small', text: 'ผู้ดูแลจะเปิดให้ลงชื่อในวันประชุม' })),
+          h('button', { class: 'btn btn-ghost', type: 'button', 'data-go': 'calendar', text: 'ดูปฏิทินการประชุม' }));
+        return;
+      }
+
+      fill(body, banner, plate, list.map((m) => meetingCard(m, {
+        hideDetail: true,
+        action: actionFor(m),
+      })));
+    }
+
+    function actionFor(m) {
+      if (m.attended) {
+        return h('div', { class: 'status ok', style: 'margin:14px 0 0' },
+          h('p', { text: `ลงชื่อแล้วโดย ${m.attendedBy}${m.attendedAt ? ` เวลา ${m.attendedAt} น.` : ''}` }));
+      }
+      if (!m.open) {
+        return h('div', { class: 'status wait', style: 'margin:14px 0 0' },
+          h('p', { text: 'การประชุมนี้ยังไม่เปิดให้ลงชื่อ หรือปิดลงชื่อแล้ว' }));
+      }
+      const err = h('div', { class: 'err' });
+      const btn = h('button', { class: 'btn', type: 'button', text: 'ลงชื่อเข้าร่วมประชุม' });
+      btn.addEventListener('click', async () => {
+        btn.disabled = true;
+        btn.textContent = 'กำลังลงชื่อ…';
+        err.textContent = '';
+        try {
+          render(await App.api('checkin', { meetingId: m.id }), m.id);
+          window.scrollTo(0, 0);
+        } catch (e) {
+          err.textContent = e.message;
+          btn.disabled = false;
+          btn.textContent = 'ลงชื่อเข้าร่วมประชุม';
+        }
+      });
+      return h('div', {}, btn, err);
+    }
+  },
+});
+</script>

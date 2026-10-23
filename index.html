@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>การจัดการภายในสำหรับลูกบ้าน</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai+Looped:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<main>
+  <header class="hello" id="hello" hidden>
+    <img id="hello-pic" alt="">
+    <div><span>สวัสดีครับ</span><strong id="hello-name"></strong></div>
+  </header>
+
+  <div class="status info" id="friend-notice" hidden>
+    <p style="margin-bottom:12px">ยังไม่ได้เพิ่มเพื่อน LINE ของหมู่บ้าน เพิ่มเพื่อนเพื่อรับข่าวสารและใช้เมนูในแชท</p>
+    <a class="btn btn-line" id="btn-add-friend" href="#">เพิ่มเพื่อน</a>
+  </div>
+
+  <!-- หน้าแรก: ระหว่างเข้าสู่ระบบ / ยังไม่ได้เข้าสู่ระบบ (เปิดนอกแอป LINE) -->
+  <section id="view-landing" hidden>
+    <div id="landing-sos" hidden>
+      <h1>เบอร์โทรฉุกเฉิน</h1>
+      <p class="lead">กดที่เบอร์เพื่อโทรออกได้ทันที ไม่ต้องเข้าสู่ระบบ</p>
+      <div id="landing-sos-list"></div>
+      <h2>เข้าสู่ระบบเพื่อแจ้งเหตุและดูแผนผังหมู่บ้าน</h2>
+    </div>
+    <p class="village" id="village-name" hidden></p>
+    <h1>การจัดการภายในสำหรับลูกบ้าน</h1>
+    <p class="lead">ระบบของหมู่บ้านสำหรับลูกบ้าน ใช้ดูกำหนดการประชุม ลงชื่อเข้าร่วม และติดตามบัญชีของหมู่บ้าน</p>
+    <ul class="features">
+      <li><svg data-icon="calendar"></svg><div><strong>ปฏิทินการประชุม</strong><span>วัน เวลา และวาระการประชุม</span></div></li>
+      <li><svg data-icon="checkin"></svg><div><strong>ลงชื่อเข้าร่วมประชุม</strong><span>ลงชื่อจากมือถือในวันประชุม</span></div></li>
+      <li><svg data-icon="home"></svg><div><strong>ข้อมูลลูกบ้าน</strong><span>ข้อมูลของคุณและสมาชิกในบ้าน</span></div></li>
+      <li><svg data-icon="receipt"></svg><div><strong>รายงานบัญชีหมู่บ้าน</strong><span>สรุปรายรับรายจ่ายรายเดือน</span></div></li>
+    </ul>
+    <div class="loading" id="landing-wait" role="status">กำลังเข้าสู่ระบบ…</div>
+    <div id="landing-login" hidden>
+      <button class="btn btn-line" id="btn-login" type="button">เข้าสู่ระบบด้วย LINE</button>
+      <p class="muted small" style="text-align:center;margin-top:12px">ใช้บัญชี LINE ยืนยันตัวตน ไม่ต้องสมัครสมาชิกเพิ่ม</p>
+    </div>
+  </section>
+
+  <section id="view-error" hidden>
+    <div class="status bad">
+      <h2>เปิดระบบไม่สำเร็จ</h2>
+      <p id="error-text"></p>
+    </div>
+    <button class="btn" id="btn-retry" type="button">เข้าสู่ระบบใหม่</button>
+  </section>
+
+  <!-- หน้าของแต่ละปุ่มถูกโหลดมาต่อท้ายตรงนี้ (ดู PAGE_FILES) -->
+</main>
+
+<script src="config.js"></script>
+<script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+<script src="app.js"></script>
+<script>
+// หน้าของแต่ละปุ่ม: เพิ่มหน้าใหม่ = เพิ่มชื่อไฟล์ 1 บรรทัด
+const PAGE_FILES = [
+  'button_A/register.html',
+  'button_A/menu.html',
+  'button_A/calendar.html',
+  'button_A/checkin.html',
+  'button_A/profile.html',
+  'button_A/accounts.html',
+  'button_C/emergency.html',
+];
+
+/** โหลดไฟล์หน้า (<section> + <script>) มาต่อใน <main> ตามลำดับ แล้วให้ <script> ในไฟล์ทำงาน */
+async function loadPages() {
+  const texts = await Promise.all(PAGE_FILES.map(async (f) => {
+    const r = await fetch(f, { cache: 'no-cache' });
+    if (!r.ok) throw new Error('โหลดไฟล์ไม่ได้: ' + f);
+    return r.text();
+  }));
+  const main = document.querySelector('main');
+  texts.forEach((html) => {
+    const t = document.createElement('template');
+    t.innerHTML = html;
+    // <script> ที่มาจาก innerHTML จะไม่ทำงาน ต้องสร้างใหม่
+    t.content.querySelectorAll('script').forEach((old) => {
+      const s = document.createElement('script');
+      s.textContent = old.textContent;
+      old.replaceWith(s);
+    });
+    main.append(t.content);
+  });
+  fillIcons(main);
+}
+
+/** ?page=...&m=... — ตอนเปิดจาก https://liff.line.me/<LIFF_ID>?page=... ค่าจะมาใน liff.state */
+function startParams() {
+  const q = new URLSearchParams(location.search);
+  const state = q.get('liff.state');
+  return state ? new URLSearchParams(state.slice(state.indexOf('?') + 1)) : q;
+}
+
+/** URL ของหน้านี้ที่มีแค่ page/m ใช้เป็นที่กลับมาหลังเข้าสู่ระบบนอกแอป LINE */
+function returnUrl(target) {
+  const q = new URLSearchParams();
+  if (target.page) q.set('page', target.page);
+  if (target.m) q.set('m', target.m);
+  return location.origin + location.pathname + (q.toString() ? '?' + q : '');
+}
+
+(async function start() {
+  fillIcons();
+  const oa = CONFIG.OA_ID;
+  $('village-name').textContent = CONFIG.VILLAGE_NAME || '';
+  $('village-name').hidden = !CONFIG.VILLAGE_NAME;
+  $('btn-add-friend').href = oa ? 'https://line.me/R/ti/p/' + encodeURIComponent(oa) : '#';
+  App.show('view-landing');
+
+  const params = startParams();
+  const target = { page: params.get('page') || '', m: params.get('m') || '' };
+
+  // ปุ่ม C: ดึงเบอร์ฉุกเฉินภายนอกทันทีโดยไม่รอเข้าสู่ระบบ
+  const sosReady = target.page !== 'emergency' ? null : callApi({ action: 'sos' })
+    .then((res) => {
+      BOOT.sos = res.contacts || [];
+      if (!BOOT.sos.length) return;
+      fill($('landing-sos-list'), callList(BOOT.sos));
+      $('landing-sos').hidden = false;
+    })
+    .catch(() => {});
+
+  if (/XXXX/.test(CONFIG.API_URL + CONFIG.LIFF_ID)) {
+    App.fatal('ยังไม่ได้ตั้งค่า API_URL / LIFF_ID ในไฟล์ config.js');
+    return;
+  }
+
+  // ในแอป LINE เปิดใหม่ก็ได้ ID token ใหม่ ส่วนนอกแอปต้องออกแล้วเข้าสู่ระบบใหม่
+  $('btn-retry').addEventListener('click', () => {
+    try {
+      if (liff.isLoggedIn() && !liff.isInClient()) {
+        liff.logout();
+        liff.login({ redirectUri: returnUrl(target) });
+        return;
+      }
+    } catch (_) {
+      // liff ยังไม่พร้อม → โหลดหน้าใหม่
+    }
+    location.reload();
+  });
+
+  try {
+    await Promise.all([loadPages(), liff.init({ liffId: CONFIG.LIFF_ID })]);
+  } catch (err) {
+    console.error(err);
+    App.fatal('เปิดระบบไม่สำเร็จ กรุณาลองใหม่อีกครั้ง');
+    return;
+  }
+
+  // ปุ่ม "กลับไปที่แชท": ในแอป LINE ปิดหน้าต่าง, นอกแอปเปิดแชท OA
+  document.querySelectorAll('[data-close]').forEach((a) => {
+    if (liff.isInClient()) {
+      a.addEventListener('click', (e) => { e.preventDefault(); liff.closeWindow(); });
+    } else if (oa) {
+      a.href = 'https://line.me/R/oaMessage/' + encodeURIComponent(oa) + '/';
+    } else {
+      a.hidden = true;
+    }
+  });
+
+  if (!liff.isLoggedIn()) {
+    $('landing-wait').hidden = true;
+    $('landing-login').hidden = false;
+    $('btn-login').addEventListener('click', () => liff.login({ redirectUri: returnUrl(target) }));
+    return;
+  }
+
+  let res;
+  try {
+    res = await callApi({ action: 'login', payload: { idToken: liff.getIDToken() } });
+  } catch (err) {
+    App.fatal(err.message);
+    return;
+  }
+  BOOT.session = res.session;
+  App.me = res.me || null;
+  App.fields = res.fields || [];
+
+  const profile = res.profile || {};
+  $('hello-name').textContent = profile.name || '';
+  if (profile.picture) $('hello-pic').src = profile.picture;
+  else $('hello-pic').hidden = true;
+  $('hello').hidden = false;
+  if (oa) liff.getFriendship().then((f) => { $('friend-notice').hidden = f.friendFlag; }).catch(() => {});
+
+  if (!App.me || App.me.status === STATUS.REJECTED) {
+    App.go('register');
+    return;
+  }
+  await sosReady;
+  if (target.page && App.pages[target.page]) App.go(target.page, { meetingId: target.m });
+  else App.go('menu');
+})();
+</script>
+</body>
+</html>
