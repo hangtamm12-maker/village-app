@@ -106,7 +106,7 @@ App.register('emergency', {
           h('p', { text: 'เหตุอันตรายต่อชีวิตหรือทรัพย์สิน กรุณาโทรจากแท็บ "แจ้งเหตุฉุกเฉิน" ทันที' })),
         field('em-type', 'ประเภท', type, true),
         field('em-detail', 'รายละเอียด', detail, true),
-        mapEl ? h('div', { class: 'field' }, h('span', { class: 'lbl', text: 'ตำแหน่งบนแผนผังหมู่บ้าน' }), mapEl) : null,
+        h('div', { class: 'field' }, h('span', { class: 'lbl', text: 'ปักหมุดตำแหน่งบนแผนที่หมู่บ้าน' }), mapEl),
         field('em-place', 'รายละเอียดสถานที่เพิ่มเติม', place, false),
         err, btn);
 
@@ -160,11 +160,11 @@ App.register('emergency', {
 
     /** แผนผังในฟอร์มแจ้งเรื่อง: แตะเพื่อเลือกช่อง (เช่น จุด A2) หรือแตะหมุดอุปกรณ์ แล้วส่งค่าให้ onPick */
     function villageMap(map, isAdmin, onPick) {
-      if (!map.image && !map.pins.length) return null;
-      const hint = 'แตะบนแผนผังหรือแตะหมุดอุปกรณ์เพื่อระบุตำแหน่งที่เกิดเหตุ';
+      const hint = 'แตะบนแผนที่เพื่อปักหมุดตำแหน่งที่ต้องการแจ้ง หรือแตะหมุดอุปกรณ์ที่ชำรุด';
       const info = h('p', { class: 'map-info', 'aria-live': 'polite', text: hint });
-      const box = h('div', { class: 'map' + (map.image ? '' : ' blank') });
-      if (map.image) box.append(h('img', { src: map.image, alt: 'แผนผังหมู่บ้าน' }));
+      const box = h('div', { class: 'map' });
+      // รูปแผนที่หมู่บ้านในเว็บ (assets/) ถ้าผู้ดูแลตั้ง MAP_FILE_ID หลังบ้านจะส่งรูปจาก Drive มาแทน
+      box.append(h('img', { src: map.image || 'assets/village-map.png', alt: 'แผนที่หมู่บ้านฮ่างต่ำเหนือ' }));
 
       // เส้นตาราง + แนวท่อประปา พิกัดเป็นตัวเลขที่หลังบ้านตรวจแล้ว
       let lines = '';
@@ -184,7 +184,7 @@ App.register('emergency', {
           h('span', { class: 'gl row', style: `top:${mid}%`, text: i + 1 }));
       }
 
-      const mark = h('div', { class: 'mark', hidden: true });
+      const mark = h('div', { class: 'mark', hidden: true, 'aria-hidden': 'true' });
       const clear = h('button', { class: 'btn btn-ghost', type: 'button', text: 'ล้างตำแหน่งที่เลือก', hidden: true });
 
       function select(x, y, pin) {
