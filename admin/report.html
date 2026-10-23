@@ -70,7 +70,7 @@ App.register('admin-report', {
         try {
           const x = await App.api('adminExport', { meetingId: r.meeting.id });
           fill(exportMsg, h('div', { class: 'status ok', style: 'margin-top:12px' },
-            h('p', { text: `สร้างแท็บ "${x.sheetName}" แล้ว เปิดแล้วดาวน์โหลดเป็น PDF หรือ Excel ได้จากเมนู ไฟล์ → ดาวน์โหลด` }),
+            h('p', { text: `เขียนรายงานลงแท็บ "${x.sheetName}" แล้ว (แทนที่รายงานเดิม) เปิดแล้วดาวน์โหลดเป็น PDF หรือ Excel ได้จากเมนู ไฟล์ → ดาวน์โหลด` }),
             h('a', { class: 'btn btn-ghost', style: 'margin-top:12px', href: x.url, target: '_blank', rel: 'noopener', text: 'เปิดรายงาน' })));
         } catch (err) {
           fill(exportMsg, errorBox(err.message));
