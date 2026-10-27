@@ -31,10 +31,10 @@ App.register('calendar', {
           return h('button', { class: 'btn', type: 'button', text: 'ไปลงชื่อเข้าร่วม',
             onclick: () => App.go('checkin', { meetingId: m.id }) });
         }
-        // ยังไม่ถึงวันประชุม: ไปหน้าลงชื่อเพื่อเปิด/ปิดแจ้งเตือน
-        if (m.early) {
+        // ยังตั้งแจ้งเตือนได้ (ถึง 30 นาทีก่อนเริ่ม): ไปหน้าลงชื่อเพื่อเปิด/ปิดแจ้งเตือน
+        if (m.canRemind) {
           return h('button', { class: 'btn btn-ghost', type: 'button',
-            text: m.remind ? 'เปิดแจ้งเตือนไว้แล้ว' : 'ตั้งแจ้งเตือนก่อนวันประชุม',
+            text: m.remind ? 'เปิดแจ้งเตือนไว้แล้ว' : 'ตั้งแจ้งเตือนการประชุม',
             onclick: () => App.go('checkin', { meetingId: m.id }) });
         }
         return null;

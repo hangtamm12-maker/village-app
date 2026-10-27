@@ -55,8 +55,8 @@ App.register('admin-incidents', {
       const sid = 'inc-status-' + i.id;
       const nid = 'inc-note-' + i.id;
       const status = h('select', { id: sid }, statuses.map((s) => h('option', { value: s, text: s, selected: s === i.status })));
-      const note = h('textarea', { id: nid, maxlength: 500, placeholder: 'เช่น ช่างจะเข้าซ่อมวันพรุ่งนี้' });
-      note.value = i.note;
+      // หมายเหตุเป็นของการแจ้งแต่ละครั้ง: เริ่มว่างเสมอ จะได้ไม่ส่งข้อความเก่าซ้ำตอนเปลี่ยนสถานะ
+      const note = h('textarea', { id: nid, maxlength: 500, placeholder: 'เว้นว่างได้ เช่น ช่างจะเข้าซ่อมวันพรุ่งนี้' });
       const err = h('div', { class: 'err' });
       const save = h('button', { class: 'btn', type: 'button', text: 'บันทึกและแจ้งผู้แจ้ง' });
 
@@ -78,8 +78,9 @@ App.register('admin-incidents', {
         h('p', { class: 'muted small', text: meta(i) }),
         h('p', { class: 'inc-detail', text: i.detail }),
         i.place ? h('p', { class: 'muted small', text: 'สถานที่: ' + i.place }) : null,
+        i.note ? h('p', { class: 'small', text: `หมายเหตุที่ส่งไปล่าสุด (${i.status}): ${i.note}` }) : null,
         h('div', { class: 'field' }, h('label', { class: 'lbl', for: sid, text: 'สถานะ' }), status),
-        h('div', { class: 'field' }, h('label', { class: 'lbl', for: nid, text: 'หมายเหตุถึงผู้แจ้ง' }), note),
+        h('div', { class: 'field' }, h('label', { class: 'lbl', for: nid, text: 'หมายเหตุใหม่ถึงผู้แจ้ง' }), note),
         save, err);
     }
   },

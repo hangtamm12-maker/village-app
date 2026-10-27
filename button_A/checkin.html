@@ -83,7 +83,7 @@ App.register('checkin', {
       // ไม่ระบุประชุม: แสดงที่เปิดลงชื่อวันนี้ + ที่กำลังจะมาถึง (ตั้งแจ้งเตือนได้)
       const list = wantedId
         ? meetings.filter((m) => m.id === wantedId)
-        : meetings.filter((m) => m.open || m.early);
+        : meetings.filter((m) => m.open || m.early || m.canRemind);
 
       const plate = h('div', { class: 'plate' }, h('div', { class: 'plate-inner' },
         h('div', { class: 'plate-label', text: 'ลงชื่อในนามบ้านเลขที่' }),
@@ -125,10 +125,17 @@ App.register('checkin', {
         return h('div', { class: 'status wait', style: 'margin:14px 0 0' },
           h('p', { text: 'การประชุมนี้ผ่านไปแล้ว ลงชื่อย้อนหลังไม่ได้' }));
       }
-      if (m.early) return reminderBox(m);
+      if (m.early) {
+        return h('div', {},
+          h('div', { class: 'status wait', style: 'margin:14px 0 0' },
+            h('p', { text: `ยังไม่ถึงวันประชุม ลงชื่อได้ใน${fmtDateLong(m.date)}` })),
+          reminderBox(m));
+      }
       if (!m.open) {
-        return h('div', { class: 'status wait', style: 'margin:14px 0 0' },
-          h('p', { text: 'การประชุมนี้ยังไม่เปิดให้ลงชื่อ หรือปิดลงชื่อแล้ว' }));
+        return h('div', {},
+          h('div', { class: 'status wait', style: 'margin:14px 0 0' },
+            h('p', { text: 'การประชุมนี้ยังไม่เปิดให้ลงชื่อ หรือปิดลงชื่อแล้ว' })),
+          reminderBox(m));
       }
       const err = h('div', { class: 'err' });
       const btn = h('button', { class: 'btn', type: 'button', text: 'ลงชื่อเข้าร่วมประชุม' });
@@ -146,17 +153,19 @@ App.register('checkin', {
           btn.textContent = 'ลงชื่อเข้าร่วมประชุม';
         }
       });
-      return h('div', {}, btn, err);
+      return h('div', {}, btn, err, reminderBox(m));
     }
 
-    /** ยังไม่ถึงวันประชุม: ลงชื่อไม่ได้ แต่เปิด/ปิดแจ้งเตือนทาง LINE ได้ (ค่าเริ่มต้นปิด) */
+    /** เปิด/ปิดแจ้งเตือนทาง LINE (ค่าเริ่มต้นปิด) ได้ถึง 30 นาทีก่อนเริ่มประชุม หลังจากนั้นซ่อนปุ่ม */
     function reminderBox(m) {
+      if (m.remindSent) return h('p', { class: 'small muted', style: 'margin:8px 0 0', text: 'ส่งข้อความแจ้งเตือนทาง LINE แล้ว' });
+      if (!m.canRemind) return null;
       const err = h('div', { class: 'err' });
       const btn = h('button', {
         class: 'btn btn-ghost',
         type: 'button',
         'aria-pressed': String(!!m.remind),
-        text: m.remind ? 'ปิดการแจ้งเตือน' : 'เปิดแจ้งเตือนก่อนวันประชุม',
+        text: m.remind ? 'ปิดการแจ้งเตือน' : 'เปิดแจ้งเตือนการประชุม',
       });
       btn.addEventListener('click', async () => {
         btn.disabled = true;
@@ -168,13 +177,11 @@ App.register('checkin', {
           btn.disabled = false;
         }
       });
-      return h('div', {},
-        h('div', { class: 'status wait', style: 'margin:14px 0 0' },
-          h('p', { text: `ยังไม่ถึงวันประชุม ลงชื่อได้ใน${fmtDateLong(m.date)}` })),
+      return h('div', { style: 'margin-top:12px' },
         btn,
         h('p', { class: 'small muted', style: 'margin:8px 0 0', text: m.remind
-          ? 'เปิดแจ้งเตือนแล้ว จะส่งข้อความ LINE เตือนในช่วงเย็นของวันก่อนประชุม'
-          : 'กดเพื่อรับข้อความ LINE เตือนในช่วงเย็นของวันก่อนประชุม' }),
+          ? `เปิดแจ้งเตือนแล้ว จะส่งข้อความ LINE ${m.remindAt}`
+          : `กดเพื่อรับข้อความ LINE เตือน${m.remindAt}` }),
         err);
     }
 
