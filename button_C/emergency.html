@@ -1,4 +1,4 @@
-<link rel="stylesheet" href="styles.css?v=3">
+<link rel="stylesheet" href="styles.css?v=4">
 <section id="page-emergency" hidden>
   <div class="tabs" role="tablist" aria-label="แจ้งเหตุ">
     <button type="button" role="tab" aria-controls="em-sos">แจ้งเหตุฉุกเฉิน</button>
@@ -141,13 +141,17 @@ App.register('emergency', {
         items.length ? items.map(incidentCard) : h('div', { class: 'empty card', text: 'ยังไม่มีเรื่องที่แจ้ง' }));
     }
 
+    /** แสดงแค่หัวเรื่อง + สีสถานะ แตะเพื่อดูรายละเอียด (เรื่องเยอะแล้วหาเรื่องล่าสุดง่าย) */
     function incidentCard(i) {
       const step = Math.max(0, data.statuses.indexOf(i.status));
       const d = parseIso(i.date);
       const when = d ? `${d.getDate()} ${TH_MONTHS_SHORT[d.getMonth()]} ${d.getFullYear() + 543}` : '';
-      return h('div', { class: 'card' },
-        h('h3', { class: 'inc-title', text: i.type }),
-        h('p', { class: 'muted small', text: `${i.id} · ${when}${i.time ? ` ${i.time} น.` : ''}` }),
+      return h('details', { class: 'card news inc st' + step },
+        h('summary', {},
+          h('span', { class: 'badge st' + step, text: i.status }),
+          h('h3', { class: 'inc-title', text: i.type }),
+          h('p', { class: 'muted small', text: `${i.id} · ${when}${i.time ? ` ${i.time} น.` : ''}` }),
+          h('span', { class: 'more', text: 'แตะเพื่อดูรายละเอียด' })),
         h('p', { class: 'inc-detail', text: i.detail }),
         i.place ? h('p', { class: 'muted small', text: 'สถานที่: ' + i.place }) : null,
         h('ol', { class: 'steps', 'aria-label': 'สถานะ: ' + i.status },

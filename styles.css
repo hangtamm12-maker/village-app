@@ -266,6 +266,14 @@ tfoot td { font-weight: 600; }
 .steps li.s0 { border-color: var(--st-recv); color: var(--st-recv-ink); }
 .steps li.s1 { border-color: var(--st-doing); color: var(--st-doing-ink); }
 .steps li.s2 { border-color: var(--st-done); color: var(--st-done-ink); }
+/* หัวเรื่องแจ้งเหตุ (ติดตามสถานะ): แถบสีซ้าย + ป้ายสถานะ สีเดียวกับขั้นตอน */
+.inc.st0 { border-left: 6px solid var(--st-recv); }
+.inc.st1 { border-left: 6px solid var(--st-doing); }
+.inc.st2 { border-left: 6px solid var(--st-done); }
+.badge.st0 { border: 1px solid var(--st-recv); color: var(--st-recv-ink); }
+.badge.st1 { border: 1px solid var(--st-doing); color: var(--st-doing-ink); }
+.badge.st2 { border: 1px solid var(--st-done); color: var(--st-done-ink); }
+.inc .steps { margin-top: 12px; }
 .legend { display: flex; flex-wrap: wrap; gap: 8px 16px; margin-bottom: 10px; font-size: 16px; }
 .legend label { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; cursor: pointer; }
 .legend input { width: 20px; height: 20px; margin: 0; accent-color: var(--plate); }
