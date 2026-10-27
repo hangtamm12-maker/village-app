@@ -1,0 +1,69 @@
+<link rel="stylesheet" href="styles.css?v=3">
+<section id="page-admin-incidents" hidden>
+  <div class="topbar">
+    <button class="back" type="button" data-go="admin"><svg data-icon="back"></svg>สำหรับผู้ดูแล</button>
+  </div>
+  <h1>การปรับเปลี่ยนสถานะแจ้งเหตุแจ้งซ่อม</h1>
+  <p class="lead">เลือกสถานะใหม่แล้วกดบันทึก ระบบแก้ในชีตให้ และส่งข้อความ LINE ถึงผู้แจ้งทันที</p>
+  <div id="inc-msg" role="status"></div>
+  <div id="inc-body"></div>
+</section>
+
+<script>
+App.register('admin-incidents', {
+  adminOnly: true,
+
+  async enter() {
+    const body = $('inc-body');
+    const msg = $('inc-msg');
+    fill(msg);
+    fill(body, loadingBox('กำลังโหลดเรื่องที่แจ้ง…'));
+    try {
+      render(await App.api('adminIncidents'));
+    } catch (err) {
+      fill(body, errorBox(err.message));
+    }
+
+    function render(res) {
+      fill(body,
+        h('h2', { text: `ยังไม่เสร็จ (${res.open.length})` }),
+        res.open.length ? res.open.map((i) => card(i, res.statuses)) : h('div', { class: 'empty card', text: 'ไม่มีเรื่องค้าง' }),
+        res.done.length ? [h('h2', { text: 'เสร็จสิ้นล่าสุด' }), res.done.map((i) => card(i, res.statuses))] : null);
+    }
+
+    function card(i, statuses) {
+      const sid = 'inc-status-' + i.id;
+      const nid = 'inc-note-' + i.id;
+      const status = h('select', { id: sid }, statuses.map((s) => h('option', { value: s, text: s, selected: s === i.status })));
+      const note = h('textarea', { id: nid, maxlength: 500, placeholder: 'เช่น ช่างจะเข้าซ่อมวันพรุ่งนี้' });
+      note.value = i.note;
+      const err = h('div', { class: 'err' });
+      const save = h('button', { class: 'btn', type: 'button', text: 'บันทึกและแจ้งผู้แจ้ง' });
+
+      save.addEventListener('click', async () => {
+        save.disabled = true;
+        err.textContent = '';
+        try {
+          render(await App.api('adminSetIncident', { id: i.id, status: status.value, note: note.value }));
+          fill(msg, h('div', { class: 'status ok' }, h('p', { text: `บันทึกเรื่อง ${i.id} เป็น "${status.value}" แล้ว` })));
+          window.scrollTo(0, 0);
+        } catch (e) {
+          err.textContent = e.message;
+          save.disabled = false;
+        }
+      });
+
+      const d = parseIso(i.date);
+      const when = d ? `${d.getDate()} ${TH_MONTHS_SHORT[d.getMonth()]} ${d.getFullYear() + 543}` : '';
+      return h('div', { class: 'card' },
+        h('h3', { class: 'inc-title', text: i.type }),
+        h('p', { class: 'muted small', text: `${i.id} · ${when}${i.time ? ` ${i.time} น.` : ''} · บ้านเลขที่ ${i.houseNo || '-'} · ${i.name}` }),
+        h('p', { class: 'inc-detail', text: i.detail }),
+        i.place ? h('p', { class: 'muted small', text: 'สถานที่: ' + i.place }) : null,
+        h('div', { class: 'field' }, h('label', { class: 'lbl', for: sid, text: 'สถานะ' }), status),
+        h('div', { class: 'field' }, h('label', { class: 'lbl', for: nid, text: 'หมายเหตุถึงผู้แจ้ง' }), note),
+        save, err);
+    }
+  },
+});
+</script>

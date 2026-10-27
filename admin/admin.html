@@ -1,4 +1,4 @@
-<link rel="stylesheet" href="styles.css?v=2">
+<link rel="stylesheet" href="styles.css?v=3">
 <section id="page-admin" hidden>
   <div class="topbar">
     <button class="back" type="button" data-go="menu"><svg data-icon="back"></svg>เมนูหลัก</button>
@@ -17,6 +17,12 @@
       <svg data-icon="chart"></svg>
       <strong>รายงานการประชุม</strong>
       <span>จำนวนบ้านที่เข้าร่วม และส่งออกรายงาน</span>
+    </button>
+    <button class="tile" type="button" data-go="admin-incidents">
+      <svg data-icon="wrench"></svg>
+      <strong>การปรับเปลี่ยนสถานะแจ้งเหตุแจ้งซ่อม</strong>
+      <span>เปลี่ยนสถานะ และแจ้งผู้แจ้งทาง LINE</span>
+      <span class="badge open" id="admin-incidents" hidden></span>
     </button>
     <button class="tile" type="button" data-go="checkin">
       <svg data-icon="qr"></svg>
@@ -42,6 +48,8 @@ App.register('admin', {
       const res = await App.api('admin');
       pending.textContent = `รออนุมัติ ${res.pending}`;
       pending.hidden = !res.pending;
+      $('admin-incidents').textContent = `ค้าง ${res.openIncidents}`;
+      $('admin-incidents').hidden = !res.openIncidents;
       fill(body, h('ul', { class: 'calls' }, res.sheets.map((s) => h('li', {},
         h('a', { href: s.url, target: '_blank', rel: 'noopener' },
           icon('sheet'),

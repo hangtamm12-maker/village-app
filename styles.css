@@ -271,28 +271,27 @@ tfoot td { font-weight: 600; }
 .legend input { width: 20px; height: 20px; margin: 0; accent-color: var(--plate); }
 .legend i { width: 14px; height: 14px; border-radius: 50%; }
 .legend i.t-pipe { border-radius: 2px; height: 6px; width: 18px; }
-.map { position: relative; overflow: hidden; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; }
-.map { cursor: crosshair; }
-.map img { display: block; width: 100%; height: auto; }
-.map .overlay { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
-.grid line { stroke: #1f2937; stroke-opacity: .35; stroke-width: 1; stroke-dasharray: 3 3; vector-effect: non-scaling-stroke; }
-.gl {
-  position: absolute; pointer-events: none; padding: 0 3px; border-radius: 4px;
+.map { overflow: hidden; border: 1px solid var(--line); border-radius: 12px; }
+/* Leaflet ตั้งฟอนต์/พื้นหลังของตัวเอง ให้ใช้ของหน้าเว็บแทน */
+.map.leaflet-container { font: inherit; background: var(--surface); cursor: crosshair; }
+.map .leaflet-bar a { width: 44px; height: 44px; line-height: 44px; font-size: 24px; color: var(--ink); background: var(--surface); border-color: var(--line); }
+.map .leaflet-bar a.leaflet-disabled { opacity: .4; }
+.map .grid { stroke: #1f2937; stroke-opacity: .35; stroke-width: 1; stroke-dasharray: 3 3; }
+.map .pipe { fill: none; stroke: var(--pipe); stroke-width: 4; stroke-opacity: 1; stroke-linecap: round; stroke-linejoin: round; }
+.gl span {
+  position: absolute; padding: 0 3px; border-radius: 4px; white-space: nowrap;
   background: var(--surface); color: var(--ink); opacity: .85; font-size: 12px; font-weight: 600; line-height: 1.4;
 }
-.gl.col { top: 2px; transform: translateX(-50%); }
-.gl.row { left: 2px; transform: translateY(-50%); }
-/* หมุดที่ผู้ใช้ปัก: หยดน้ำหมุน -45° ปลายแหลมอยู่ใต้จุดศูนย์กลาง 22.6px จึงเลื่อนขึ้นให้ปลายตรงจุดที่แตะ */
-.mark {
-  position: absolute; width: 32px; height: 32px; margin: -39px 0 0 -16px; pointer-events: none;
-  border-radius: 50% 50% 50% 0; transform: rotate(-45deg); background: var(--bad); border: 3px solid #fff;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, .45);
+.gl.col span { top: 2px; transform: translateX(-50%); }
+.gl.row span { left: 2px; transform: translateY(-50%); }
+/* หมุดที่ผู้ใช้ปัก: หยดน้ำหมุน -45° ปลายแหลมอยู่ใต้จุดศูนย์กลาง 22.6px จึงตั้ง iconAnchor ให้ปลายตรงจุดที่แตะ */
+.mark i {
+  position: absolute; inset: 0; border-radius: 50% 50% 50% 0; transform: rotate(-45deg);
+  background: var(--bad); border: 3px solid #fff; box-shadow: 0 2px 6px rgba(0, 0, 0, .45);
 }
-.mark::after { content: ""; position: absolute; inset: 7px; border-radius: 50%; background: #fff; }
+.mark i::after { content: ""; position: absolute; inset: 7px; border-radius: 50%; background: #fff; }
 .map + .map-info + .btn { margin-top: 8px; }
-.overlay polyline { fill: none; stroke: var(--pipe); stroke-width: 4; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
 .pin {
-  position: absolute; width: 34px; height: 34px; margin: -17px 0 0 -17px; padding: 0;
   display: grid; place-items: center; border: 2px solid #fff; border-radius: 50%;
   color: #fff; cursor: pointer; box-shadow: 0 1px 4px rgba(0,0,0,.45);
 }
@@ -302,7 +301,6 @@ tfoot td { font-weight: 600; }
 .t-light { background: var(--light); }
 .t-camera { background: var(--camera); }
 i.t-pipe { background: var(--pipe); }
-.map.hide-speaker .t-speaker, .map.hide-light .t-light, .map.hide-camera .t-camera, .map.hide-pipe .t-pipe { display: none; }
 .map-info { margin: 8px 0 0; font-size: 15px; color: var(--muted); min-height: 1.6em; }
 
 /* ข่าวสาร (ปุ่ม B) */

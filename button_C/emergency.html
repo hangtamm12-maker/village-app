@@ -1,4 +1,4 @@
-<link rel="stylesheet" href="styles.css?v=2">
+<link rel="stylesheet" href="styles.css?v=3">
 <section id="page-emergency" hidden>
   <div class="tabs" role="tablist" aria-label="แจ้งเหตุ">
     <button type="button" role="tab" aria-controls="em-sos">แจ้งเหตุฉุกเฉิน</button>
@@ -159,82 +159,117 @@ App.register('emergency', {
         i.note ? h('p', { class: 'small', text: 'หมายเหตุจากผู้ดูแล: ' + i.note }) : null);
     }
 
-    /** แผนผังในฟอร์มแจ้งเรื่อง: แตะเพื่อเลือกช่อง (เช่น จุด A2) หรือแตะหมุดอุปกรณ์ แล้วส่งค่าให้ onPick */
+    /** แผนที่ในฟอร์มแจ้งเรื่อง (Leaflet บนรูปแผนที่หมู่บ้าน): ซูม/เลื่อนได้ แตะเพื่อเลือกช่อง (เช่น จุด A2) หรือแตะหมุดอุปกรณ์ แล้วส่งค่าให้ onPick */
     function villageMap(map, isAdmin, onPick) {
-      const hint = 'แตะบนแผนที่เพื่อปักหมุดตำแหน่งที่ต้องการแจ้ง หรือแตะหมุดอุปกรณ์ที่ชำรุด';
+      const hint = 'ซูมด้วยสองนิ้วหรือปุ่ม + − แล้วแตะบนแผนที่เพื่อปักหมุด หรือแตะหมุดอุปกรณ์ที่ชำรุด';
       const info = h('p', { class: 'map-info', 'aria-live': 'polite', text: hint });
+      if (!window.L) {
+        info.textContent = 'โหลดแผนที่ไม่สำเร็จ กรุณาระบุสถานที่ในช่องด้านล่างแทน';
+        return info;
+      }
       const box = h('div', { class: 'map' });
-      // รูปแผนที่หมู่บ้านในเว็บ (assets/) ถ้าผู้ดูแลตั้ง MAP_FILE_ID หลังบ้านจะส่งรูปจาก Drive มาแทน
-      box.append(h('img', { src: map.image || 'assets/village-map.png', alt: 'แผนที่หมู่บ้านฮ่างต่ำเหนือ' }));
-
-      // เส้นตาราง + แนวท่อประปา พิกัดเป็นตัวเลขที่หลังบ้านตรวจแล้ว
-      let lines = '';
-      for (let i = 1; i < GRID; i++) {
-        const v = i * 100 / GRID;
-        lines += `<line x1="${v}" y1="0" x2="${v}" y2="100"/><line x1="0" y1="${v}" x2="100" y2="${v}"/>`;
-      }
-      const pipes = map.pins.filter((p) => p.type === 'ท่อประปา' && p.points.length > 1);
-      const t = document.createElement('template');
-      t.innerHTML = '<svg class="overlay" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">' +
-        `<g class="grid">${lines}</g><g class="t-pipe">` +
-        pipes.map((p) => `<polyline points="${p.points.map((xy) => xy.join(',')).join(' ')}"/>`).join('') + '</g></svg>';
-      box.append(t.content.firstChild);
-      for (let i = 0; i < GRID; i++) {
-        const mid = (i + 0.5) * 100 / GRID;
-        box.append(h('span', { class: 'gl col', style: `left:${mid}%`, text: String.fromCharCode(65 + i) }),
-          h('span', { class: 'gl row', style: `top:${mid}%`, text: i + 1 }));
-      }
-
-      const mark = h('div', { class: 'mark', hidden: true, 'aria-hidden': 'true' });
+      const legend = h('div', { class: 'legend' });
       const clear = h('button', { class: 'btn btn-ghost', type: 'button', text: 'ล้างตำแหน่งที่เลือก', hidden: true });
-
-      function select(x, y, pin) {
-        const label = 'จุด ' + gridCell(x, y) + (pin ? ` (${pin.type} ${pin.name})` : '');
-        mark.style.left = x + '%';
-        mark.style.top = y + '%';
-        mark.hidden = false;
-        clear.hidden = false;
-        // ผู้ดูแลเห็นค่า x,y ด้วย สำหรับใส่ในชีต MapPins
-        info.textContent = 'ตำแหน่งที่เลือก: ' + label + (pin && pin.note ? ` · ${pin.note}` : '') +
-          (isAdmin ? ` · x,y = ${x.toFixed(1)},${y.toFixed(1)}` : '');
-        onPick(label);
-      }
-
-      clear.addEventListener('click', () => {
-        mark.hidden = true;
-        clear.hidden = true;
-        info.textContent = hint;
-        onPick('');
-      });
-
-      map.pins.filter((p) => p.type !== 'ท่อประปา').forEach((p) => {
-        const [x, y] = p.points[0];
-        const key = PIN_KEYS[p.type];
-        box.append(h('button', {
-          type: 'button',
-          class: 'pin t-' + key,
-          style: `left:${x}%;top:${y}%`,
-          'aria-label': `${p.type} ${p.name} จุด ${gridCell(x, y)}`,
-          onclick: (e) => {
-            e.stopPropagation();
-            select(x, y, p);
-          },
-        }, icon(key)));
-      });
-      box.append(mark);
-
-      box.addEventListener('click', (e) => {
-        const r = box.getBoundingClientRect();
-        select((e.clientX - r.left) / r.width * 100, (e.clientY - r.top) / r.height * 100, null);
-      });
-
-      const legend = h('div', { class: 'legend' }, map.types.map((type) => {
-        const key = PIN_KEYS[type];
-        const cb = h('input', { type: 'checkbox', checked: true });
-        cb.addEventListener('change', () => box.classList.toggle('hide-' + key, !cb.checked));
-        return h('label', {}, cb, h('i', { class: 't-' + key }), type);
-      }));
+      // รูปแผนที่หมู่บ้านในเว็บ (assets/) ถ้าผู้ดูแลตั้ง MAP_FILE_ID หลังบ้านจะส่งรูปจาก Drive มาแทน
+      const src = map.image || 'assets/village-map.png';
+      const img = new Image();
+      img.onload = img.onerror = () => draw(img.naturalWidth || 1000, img.naturalHeight || 1000);
+      img.src = src;
       return h('div', {}, legend, box, info, clear);
+
+      // ต้องรู้ขนาดรูปก่อน เพราะพิกัดหมุดในชีตเป็น % ของกว้าง/สูง
+      function draw(W, H) {
+        const bounds = [[-H, 0], [0, W]];
+        const at = (x, y) => [-y / 100 * H, x / 100 * W];
+        box.style.aspectRatio = W + ' / ' + H;
+        const lmap = L.map(box, {
+          // minZoom ติดลบได้ เพราะรูปใหญ่กว่ากรอบบนมือถือ (ค่าจริงตั้งใหม่ตอนรู้ขนาดกรอบ)
+          crs: L.CRS.Simple, minZoom: -5, zoomSnap: 0, maxBounds: bounds, maxBoundsViscosity: 1,
+          zoomControl: false, attributionControl: false, scrollWheelZoom: false, dragging: false,
+        });
+        L.control.zoom({ position: 'bottomright', zoomInTitle: 'ซูมเข้า', zoomOutTitle: 'ซูมออก' }).addTo(lmap);
+        L.imageOverlay(src, bounds, { alt: 'แผนที่หมู่บ้านฮ่างต่ำเหนือ' }).addTo(lmap);
+
+        // เส้นตาราง A–J / 1–10
+        const lines = [];
+        for (let i = 1; i < GRID; i++) {
+          const v = i * 100 / GRID;
+          lines.push([at(v, 0), at(v, 100)], [at(0, v), at(100, v)]);
+        }
+        L.polyline(lines, { className: 'grid', interactive: false }).addTo(lmap);
+        for (let i = 0; i < GRID; i++) {
+          const mid = (i + 0.5) * 100 / GRID;
+          const label = (pos, cls, text) => L.marker(pos, { interactive: false, keyboard: false,
+            icon: L.divIcon({ className: 'gl ' + cls, iconSize: null, html: `<span>${text}</span>` }) }).addTo(lmap);
+          label(at(mid, 0), 'col', String.fromCharCode(65 + i));
+          label(at(0, mid), 'row', i + 1);
+        }
+
+        // ประเภทละชั้น ให้ติ๊กเปิด/ปิดจากคำอธิบายสัญลักษณ์ได้
+        const layers = {};
+        map.types.forEach((type) => {
+          const key = PIN_KEYS[type];
+          layers[type] = L.layerGroup().addTo(lmap);
+          const cb = h('input', { type: 'checkbox', checked: true });
+          cb.addEventListener('change', () => (cb.checked ? layers[type].addTo(lmap) : layers[type].remove()));
+          legend.append(h('label', {}, cb, h('i', { class: 't-' + key }), type));
+        });
+
+        map.pins.forEach((p) => {
+          const layer = layers[p.type] || (layers[p.type] = L.layerGroup().addTo(lmap));
+          if (p.type === 'ท่อประปา') {
+            if (p.points.length > 1) L.polyline(p.points.map(([x, y]) => at(x, y)), { className: 'pipe', interactive: false }).addTo(layer);
+            return;
+          }
+          const [x, y] = p.points[0];
+          const key = PIN_KEYS[p.type];
+          const m = L.marker(at(x, y), { icon: L.divIcon({ className: 'pin t-' + key, iconSize: [34, 34], html: icon(key) }) })
+            .on('click', () => select(x, y, p))
+            // ตัวหมุดถูกสร้างตอนแผนที่แสดงครั้งแรก (แท็บซ่อนอยู่ตอนนี้)
+            .on('add', () => m.getElement().setAttribute('aria-label', `${p.type} ${p.name} จุด ${gridCell(x, y)}`))
+            .addTo(layer);
+        });
+
+        const mark = L.marker([0, 0], { interactive: false, keyboard: false,
+          icon: L.divIcon({ className: 'mark', iconSize: [32, 32], iconAnchor: [16, 39], html: '<i></i>' }) });
+
+        function select(x, y, pin) {
+          const label = 'จุด ' + gridCell(x, y) + (pin ? ` (${pin.type} ${pin.name})` : '');
+          mark.setLatLng(at(x, y)).addTo(lmap);
+          clear.hidden = false;
+          // ผู้ดูแลเห็นค่า x,y ด้วย สำหรับใส่ในชีต MapPins
+          info.textContent = 'ตำแหน่งที่เลือก: ' + label + (pin && pin.note ? ` · ${pin.note}` : '') +
+            (isAdmin ? ` · x,y = ${x.toFixed(1)},${y.toFixed(1)}` : '');
+          onPick(label);
+        }
+
+        clear.addEventListener('click', () => {
+          mark.remove();
+          clear.hidden = true;
+          info.textContent = hint;
+          onPick('');
+        });
+
+        lmap.on('click', (e) => {
+          const x = e.latlng.lng / W * 100;
+          const y = -e.latlng.lat / H * 100;
+          if (x >= 0 && x <= 100 && y >= 0 && y <= 100) select(x, y, null);
+        });
+
+        // ยังไม่ซูม: นิ้วเดียวเลื่อนหน้าเว็บได้ตามปกติ / ซูมแล้ว: ลากเลื่อนแผนที่ได้
+        lmap.on('zoomend', () => lmap.dragging[lmap.getZoom() > lmap.getMinZoom() + 0.01 ? 'enable' : 'disable']());
+
+        // แท็บนี้ซ่อนอยู่ตอนสร้าง ต้องรอให้กล่องมีขนาดก่อนจึงจัดรูปให้พอดีกรอบ
+        let fitted = false;
+        new ResizeObserver(() => {
+          if (!box.clientWidth) return;
+          lmap.invalidateSize();
+          const z = lmap.getBoundsZoom(bounds);
+          lmap.setMinZoom(z).setMaxZoom(z + 3);
+          if (!fitted) lmap.fitBounds(bounds);
+          fitted = true;
+        }).observe(box);
+      }
     }
   },
 });
