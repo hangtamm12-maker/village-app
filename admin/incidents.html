@@ -4,7 +4,7 @@
     <button class="back" type="button" data-go="admin"><svg data-icon="back"></svg>สำหรับผู้ดูแล</button>
   </div>
   <h1>การปรับเปลี่ยนสถานะแจ้งเหตุแจ้งซ่อม</h1>
-  <p class="lead">เลือกสถานะใหม่แล้วกดบันทึก ระบบแก้ในชีตให้ และส่งข้อความ LINE ถึงผู้แจ้งทันที</p>
+  <p class="lead">เลือกสถานะใหม่แล้วกดบันทึก ระบบแก้ในชีตให้ และส่งข้อความ LINE ถึงผู้แจ้งทันที เรื่องที่เสร็จสิ้นแล้วดูได้อย่างเดียว</p>
   <div id="inc-msg" role="status"></div>
   <div id="inc-body"></div>
 </section>
@@ -28,9 +28,29 @@ App.register('admin-incidents', {
       fill(body,
         h('h2', { text: `ยังไม่เสร็จ (${res.open.length})` }),
         res.open.length ? res.open.map((i) => card(i, res.statuses)) : h('div', { class: 'empty card', text: 'ไม่มีเรื่องค้าง' }),
-        res.done.length ? [h('h2', { text: 'เสร็จสิ้นล่าสุด' }), res.done.map((i) => card(i, res.statuses))] : null);
+        res.done.length ? [h('h2', { text: 'เสร็จสิ้นล่าสุด' }), res.done.map(record)] : null);
     }
 
+    function meta(i) {
+      const d = parseIso(i.date);
+      const when = d ? `${d.getDate()} ${TH_MONTHS_SHORT[d.getMonth()]} ${d.getFullYear() + 543}` : '';
+      return `${i.id} · ${when}${i.time ? ` ${i.time} น.` : ''} · บ้านเลขที่ ${i.houseNo || '-'} · ${i.name}`;
+    }
+
+    /** เรื่องที่เสร็จสิ้นแล้ว: ดูอย่างเดียว แตะเพื่อเปิดรายละเอียด */
+    function record(i) {
+      return h('details', { class: 'card news' },
+        h('summary', {},
+          h('span', { class: 'badge ok', text: i.status }),
+          h('h3', { text: i.type }),
+          h('p', { class: 'muted small', text: meta(i) }),
+          h('span', { class: 'more', text: 'แตะเพื่อดูรายละเอียด' })),
+        h('p', { class: 'inc-detail', text: i.detail }),
+        i.place ? h('p', { class: 'muted small', text: 'สถานที่: ' + i.place }) : null,
+        i.note ? h('p', { class: 'small', text: 'หมายเหตุถึงผู้แจ้ง: ' + i.note }) : null);
+    }
+
+    /** เรื่องที่ยังไม่เสร็จ: เปลี่ยนสถานะ/หมายเหตุได้ */
     function card(i, statuses) {
       const sid = 'inc-status-' + i.id;
       const nid = 'inc-note-' + i.id;
@@ -53,11 +73,9 @@ App.register('admin-incidents', {
         }
       });
 
-      const d = parseIso(i.date);
-      const when = d ? `${d.getDate()} ${TH_MONTHS_SHORT[d.getMonth()]} ${d.getFullYear() + 543}` : '';
       return h('div', { class: 'card' },
         h('h3', { class: 'inc-title', text: i.type }),
-        h('p', { class: 'muted small', text: `${i.id} · ${when}${i.time ? ` ${i.time} น.` : ''} · บ้านเลขที่ ${i.houseNo || '-'} · ${i.name}` }),
+        h('p', { class: 'muted small', text: meta(i) }),
         h('p', { class: 'inc-detail', text: i.detail }),
         i.place ? h('p', { class: 'muted small', text: 'สถานที่: ' + i.place }) : null,
         h('div', { class: 'field' }, h('label', { class: 'lbl', for: sid, text: 'สถานะ' }), status),

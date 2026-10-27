@@ -31,8 +31,6 @@
     </button>
   </div>
 
-  <h2>แก้ไขข้อมูลอื่นใน Google Sheets</h2>
-  <p class="muted small">เปิดด้วยบัญชี Google ที่ได้รับสิทธิ์แก้ไขชีตของหมู่บ้าน</p>
   <div id="admin-body"></div>
 </section>
 
@@ -40,21 +38,16 @@
 App.register('admin', {
   adminOnly: true,
 
+  // ตัวเลขงานที่รอบนปุ่ม (ข้อมูลอื่นผู้ดูแลแก้เองใน Google Sheets)
   async enter() {
     const body = $('admin-body');
-    const pending = $('admin-pending');
-    fill(body, loadingBox('กำลังโหลด…'));
+    fill(body);
     try {
       const res = await App.api('admin');
-      pending.textContent = `รออนุมัติ ${res.pending}`;
-      pending.hidden = !res.pending;
+      $('admin-pending').textContent = `รออนุมัติ ${res.pending}`;
+      $('admin-pending').hidden = !res.pending;
       $('admin-incidents').textContent = `ค้าง ${res.openIncidents}`;
       $('admin-incidents').hidden = !res.openIncidents;
-      fill(body, h('ul', { class: 'calls' }, res.sheets.map((s) => h('li', {},
-        h('a', { href: s.url, target: '_blank', rel: 'noopener' },
-          icon('sheet'),
-          h('span', {}, h('strong', { text: s.label }), h('small', { text: s.hint })),
-          s.badge ? h('b', { class: 'count', text: s.badge }) : null)))));
     } catch (err) {
       fill(body, errorBox(err.message));
     }
