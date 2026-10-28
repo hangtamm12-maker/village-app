@@ -7,3 +7,6 @@ mockup/
 
 # ทดสอบ (ใช้ไฟล์ .gs ในเครื่อง) ไม่ขึ้น GitHub Pages
 tests/
+
+# ตำแหน่งกล้องวงจรปิด ไม่เผยแพร่สาธารณะ (เก็บใน Google Drive แทน)
+assets/village-map-camera.png
