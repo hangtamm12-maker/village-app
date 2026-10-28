@@ -291,13 +291,20 @@ App.register('emergency', {
 
     /** แผนที่จริง ภาพดาวเทียม Esri หรือถนน OpenStreetMap (ไม่ต้องใช้ API key) แตะเพื่อปักหมุด แล้วส่งลิงก์ Google Maps ของจุดนั้นให้ onPick */
     function streetMap(map, onPick) {
-      // แผนผังหมู่บ้านเป็นภาพจาก Google Maps (ทิศเหนือขึ้น ตามมาตราส่วน) จึงแปลง x,y % เป็นพิกัดจริงจากจุดอ้างอิง 2 จุดได้
-      // shortcut: เทียบเชิงเส้น คลาดเคลื่อนไม่กี่เมตรในระยะหมู่บ้าน ถ้าเปลี่ยนรูปแผนผังต้องแก้ MAP_REF ใน config.js ด้วย
+      // แปลง x,y % บนแผนผังเป็นพิกัดจริงจากจุดอ้างอิง 3 จุด: ค่า = p + b·(x−p.x) + c·(y−p.y)
+      // ใช้ 3 จุดเพราะแผนผังยืด/เอียงไม่เท่ากันแต่ละแกน ถ้าเปลี่ยนรูปแผนผังต้องแก้ MAP_REF ใน config.js ด้วย
       const ref = CONFIG.MAP_REF;
-      const toLL = ref && (([x, y]) => {
-        const [a, b] = ref;
-        return [a.lat + (y - a.y) * (b.lat - a.lat) / (b.y - a.y), a.lng + (x - a.x) * (b.lng - a.lng) / (b.x - a.x)];
-      });
+      const toLL = ref && (() => {
+        const [p, q, r] = ref;
+        const det = (q.x - p.x) * (r.y - p.y) - (r.x - p.x) * (q.y - p.y);
+        const axis = (k) => {
+          const b = ((q[k] - p[k]) * (r.y - p.y) - (r[k] - p[k]) * (q.y - p.y)) / det;
+          const c = ((r[k] - p[k]) * (q.x - p.x) - (q[k] - p[k]) * (r.x - p.x)) / det;
+          return (x, y) => p[k] + b * (x - p.x) + c * (y - p.y);
+        };
+        const lat = axis('lat'), lng = axis('lng');
+        return ([x, y]) => [lat(x, y), lng(x, y)];
+      })();
       const hint = 'เลื่อนและซูมไปยังจุดเกิดเหตุ แล้วแตะเพื่อปักหมุด ผู้ดูแลจะได้ลิงก์ Google Maps ของจุดนั้น';
       const box = h('div', { class: 'map', style: 'aspect-ratio: 1' });
       const info = h('p', { class: 'map-info', 'aria-live': 'polite', text: hint });
