@@ -1,4 +1,4 @@
-<link rel="stylesheet" href="styles.css?v=4">
+<link rel="stylesheet" href="styles.css?v=5">
 <section id="page-emergency" hidden>
   <div class="tabs" role="tablist" aria-label="แจ้งเหตุ">
     <button type="button" role="tab" aria-controls="em-sos">แจ้งเหตุฉุกเฉิน</button>
@@ -100,14 +100,25 @@ App.register('emergency', {
       const place = h('input', { id: 'em-place', type: 'text', maxlength: 150, placeholder: 'เช่น หน้าบ้านเลขที่ 12 ซอย 3' });
       const err = h('div', { class: 'form-error', role: 'alert' });
       const btn = h('button', { class: 'btn', type: 'submit', text: 'ส่งเรื่อง' });
+      // ส่งตำแหน่งจากแผนที่ที่เลือกล่าสุด: ปักบนแผนที่หนึ่งแล้วล้างหมุดบนอีกแผนที่
       let point = '';
-      const mapEl = villageMap(data.map, data.isAdmin, (label) => { point = label; });
+      const village = villageMap(data.map, data.isAdmin, (label) => { if (label) street.reset(); point = label; });
+      const street = streetMap(data.map, (link) => { village.reset(); point = link; });
+      const radio = (value, text, checked) => h('label', {},
+        h('input', { type: 'radio', name: 'em-mapsrc', value, checked, onchange: () => {
+          village.hidden = value !== 'village';
+          if (value === 'street') street.show(); else street.hidden = true;
+        } }), text);
+      const mapEl = window.L
+        ? h('div', {}, h('div', { class: 'legend', role: 'radiogroup', 'aria-label': 'เลือกแผนที่' },
+          radio('village', 'แผนที่หมู่บ้าน', true), radio('street', 'แผนที่จริง', false)), village, street)
+        : village;
       const form = h('form', { novalidate: true },
         h('div', { class: 'status bad' },
           h('p', { text: 'เหตุอันตรายต่อชีวิตหรือทรัพย์สิน กรุณาโทรจากแท็บ "แจ้งเหตุฉุกเฉิน" ทันที' })),
         field('em-type', 'ประเภท', type, true),
         field('em-detail', 'รายละเอียด', detail, true),
-        h('div', { class: 'field' }, h('span', { class: 'lbl', text: 'ปักหมุดตำแหน่งบนแผนที่หมู่บ้าน' }), mapEl),
+        h('div', { class: 'field' }, h('span', { class: 'lbl', text: 'ปักหมุดตำแหน่งบนแผนที่' }), mapEl),
         field('em-place', 'รายละเอียดสถานที่เพิ่มเติม', place, false),
         err, btn);
 
@@ -179,7 +190,9 @@ App.register('emergency', {
       const img = new Image();
       img.onload = img.onerror = () => draw(img.naturalWidth || 1000, img.naturalHeight || 1000);
       img.src = src;
-      return h('div', {}, legend, box, info, clear);
+      const wrap = h('div', {}, legend, box, info, clear);
+      wrap.reset = () => { if (!clear.hidden) clear.click(); };
+      return wrap;
 
       // ต้องรู้ขนาดรูปก่อน เพราะพิกัดหมุดในชีตเป็น % ของกว้าง/สูง
       function draw(W, H) {
@@ -274,6 +287,66 @@ App.register('emergency', {
           fitted = true;
         }).observe(box);
       }
+    }
+
+    /** แผนที่จริง ภาพดาวเทียม Esri หรือถนน OpenStreetMap (ไม่ต้องใช้ API key) แตะเพื่อปักหมุด แล้วส่งลิงก์ Google Maps ของจุดนั้นให้ onPick */
+    function streetMap(map, onPick) {
+      // แผนผังหมู่บ้านเป็นภาพจาก Google Maps (ทิศเหนือขึ้น ตามมาตราส่วน) จึงแปลง x,y % เป็นพิกัดจริงจากจุดอ้างอิง 2 จุดได้
+      // shortcut: เทียบเชิงเส้น คลาดเคลื่อนไม่กี่เมตรในระยะหมู่บ้าน ถ้าเปลี่ยนรูปแผนผังต้องแก้ MAP_REF ใน config.js ด้วย
+      const ref = CONFIG.MAP_REF;
+      const toLL = ref && (([x, y]) => {
+        const [a, b] = ref;
+        return [a.lat + (y - a.y) * (b.lat - a.lat) / (b.y - a.y), a.lng + (x - a.x) * (b.lng - a.lng) / (b.x - a.x)];
+      });
+      const hint = 'เลื่อนและซูมไปยังจุดเกิดเหตุ แล้วแตะเพื่อปักหมุด ผู้ดูแลจะได้ลิงก์ Google Maps ของจุดนั้น';
+      const box = h('div', { class: 'map', style: 'aspect-ratio: 1' });
+      const info = h('p', { class: 'map-info', 'aria-live': 'polite', text: hint });
+      const wrap = h('div', { hidden: true }, box, info);
+      let lmap, mark;
+      // สร้างตอนเปิดดูครั้งแรก เพราะ Leaflet ต้องรู้ขนาดกรอบ (ตอนซ่อนกว้าง 0)
+      wrap.show = () => {
+        wrap.hidden = false;
+        if (lmap) return void lmap.invalidateSize();
+        lmap = L.map(box, { scrollWheelZoom: false, zoomControl: false }).setView(CONFIG.MAP_CENTER, 16);
+        L.control.zoom({ position: 'bottomright', zoomInTitle: 'ซูมเข้า', zoomOutTitle: 'ซูมออก' }).addTo(lmap);
+        // ภาพดาวเทียม Esri (ฟรี ไม่ต้องใช้ key ไม่มีป้ายชื่อ) ซูมเกิน 18 ใช้ภาพขยาย เพราะชนบทมักไม่มีภาพละเอียดกว่านั้น
+        const sat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+          maxZoom: 19, maxNativeZoom: 18, attribution: 'Imagery &copy; Esri',
+        }).addTo(lmap);
+        const osm = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+        });
+        // อุปกรณ์จากชีต MapPins ประเภทละชั้น เปิด/ปิดได้จากปุ่มชั้นแผนที่
+        const overlays = {};
+        if (toLL) map.pins.forEach((p) => {
+          const layer = overlays[p.type] || (overlays[p.type] = L.layerGroup().addTo(lmap));
+          if (p.type === 'ท่อประปา') {
+            if (p.points.length > 1) L.polyline(p.points.map(toLL), { className: 'pipe', interactive: false }).addTo(layer);
+            return;
+          }
+          const key = PIN_KEYS[p.type];
+          const m = L.marker(toLL(p.points[0]), { title: `${p.type} ${p.name}`,
+            icon: L.divIcon({ className: 'pin t-' + key, iconSize: [34, 34], html: icon(key) }) })
+            .on('click', () => pick(m.getLatLng(), p))
+            .addTo(layer);
+        });
+        L.control.layers({ 'ดาวเทียม': sat, 'ถนน': osm }, overlays, { position: 'topright' }).addTo(lmap);
+        mark = L.marker(CONFIG.MAP_CENTER, { interactive: false, keyboard: false,
+          icon: L.divIcon({ className: 'mark', iconSize: [32, 32], iconAnchor: [16, 39], html: '<i></i>' }) });
+        lmap.on('click', (e) => pick(e.latlng, null));
+      };
+      function pick(latlng, pin) {
+        const ll = latlng.lat.toFixed(6) + ',' + latlng.lng.toFixed(6);
+        const name = pin ? `${pin.type} ${pin.name}` : '';
+        mark.setLatLng(latlng).addTo(lmap);
+        info.textContent = 'ตำแหน่งที่เลือก: ' + (name ? name + (pin.note ? ` · ${pin.note}` : '') + ' · ' : '') + ll + ' (ส่งเป็นลิงก์ Google Maps)';
+        onPick((name ? name + ' ' : '') + 'https://maps.google.com/?q=' + ll);
+      }
+      wrap.reset = () => {
+        if (mark) mark.remove();
+        info.textContent = hint;
+      };
+      return wrap;
     }
   },
 });

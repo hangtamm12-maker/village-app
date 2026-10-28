@@ -346,3 +346,14 @@ i.t-pipe { background: var(--pipe); }
 .btn-danger { color: var(--bad); border-color: var(--bad); }
 .report th, .report td { text-align: left; white-space: normal; }
 .absent { margin: 0; padding: 14px 16px; background: var(--surface); border: 1px solid var(--line); border-radius: 16px; line-height: 1.9; overflow-wrap: anywhere; }
+
+/* ผังบุคลากร: รายการซ้อนกัน มีเส้นโยงจากหัวหน้าลงมาที่ผู้ช่วย */
+.org, .org ul { list-style: none; margin: 0; padding: 0; }
+.org ul { margin-left: 26px; padding-left: 14px; border-left: 2px solid var(--line); }
+.org ul > li { position: relative; }
+.org ul > li::before { content: ''; position: absolute; left: -14px; top: 36px; width: 14px; border-top: 2px solid var(--line); }
+.person { display: flex; align-items: center; gap: 12px; padding: 10px 12px; margin-bottom: 10px; }
+.person strong { display: block; }
+.person div > span { color: var(--muted); }
+.face { position: relative; flex: none; width: 52px; height: 52px; border-radius: 50%; overflow: hidden; background: var(--pick); color: var(--plate); display: grid; place-items: center; font-weight: 700; font-size: 1.3rem; }
+.face img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }

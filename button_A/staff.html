@@ -1,0 +1,49 @@
+<link rel="stylesheet" href="styles.css?v=5">
+<section id="page-staff" hidden>
+  <div class="topbar">
+    <button class="back" type="button" data-go="menu"><svg data-icon="back"></svg>เมนูหลัก</button>
+  </div>
+  <h1>บุคลากรของหมู่บ้าน</h1>
+  <div id="staff-body"></div>
+</section>
+
+<script>
+App.register('staff', {
+  memberOnly: true,
+
+  async enter() {
+    const body = $('staff-body');
+    fill(body, loadingBox('กำลังโหลดรายชื่อ…'));
+    try {
+      const res = await App.api('staff');
+      fill(body, res.staff.length ? orgTree(res.staff) : h('div', { class: 'empty card', text: 'ยังไม่ได้ใส่รายชื่อบุคลากร' }));
+    } catch (err) {
+      fill(body, errorBox(err.message));
+    }
+
+    /** แถวเรียงตามชีต ระดับมากกว่าแถวก่อนหน้า = อยู่ใต้แถวนั้น (ข้ามระดับได้ทีละขั้นเดียว) */
+    function orgTree(staff) {
+      const root = h('ul', { class: 'org' });
+      const open = []; // li ล่าสุดของแต่ละระดับ
+      staff.forEach((s) => {
+        const level = Math.min(s.level, open.length + 1);
+        open.length = level - 1;
+        const up = open[level - 2];
+        const list = !up ? root : up.querySelector(':scope > ul') || up.appendChild(h('ul'));
+        open.push(list.appendChild(h('li', {}, person(s))));
+      });
+      return root;
+    }
+
+    function person(s) {
+      const face = h('span', { class: 'face', text: s.name.slice(0, 1) });
+      if (s.photo) {
+        // โหลดรูปไม่ได้ (ไฟล์ไม่ได้แชร์) แสดงอักษรแรกของชื่อแทน
+        face.append(h('img', { src: s.photo, alt: '', loading: 'lazy', referrerpolicy: 'no-referrer', onerror: (e) => e.target.remove() }));
+      }
+      return h('div', { class: 'card person' }, face,
+        h('div', {}, h('strong', { text: s.name }), h('span', { text: s.role })));
+    }
+  },
+});
+</script>
