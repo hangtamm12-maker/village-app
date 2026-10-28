@@ -184,7 +184,18 @@ input:focus, select:focus, textarea:focus { outline: 3px solid var(--focus); out
 .badge.open { background: var(--wait-bg); color: var(--wait); }
 .card .btn { margin-top: 14px; }
 .empty { text-align: center; padding: 28px 12px; color: var(--muted); }
-.loading { padding: 56px 0; text-align: center; color: var(--muted); }
+/* กำลังโหลด: บ้านหลังเล็กเด้งขึ้นลงพร้อมเงา ข้อความสั้นอยู่ใต้ภาพ (โปรแกรมอ่านหน้าจอยังอ่านข้อความได้) */
+.loading { display: flex; flex-direction: column; align-items: center; padding: 48px 0; color: var(--muted); font-size: 15px; }
+.loading::before {
+  content: ""; order: -2; width: 56px; height: 56px; background: var(--plate);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 10.5 12 3l9 7.5'/%3E%3Cpath d='M5 9.5V21h14V9.5'/%3E%3Cpath d='M10 21v-6h4v6'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 10.5 12 3l9 7.5'/%3E%3Cpath d='M5 9.5V21h14V9.5'/%3E%3Cpath d='M10 21v-6h4v6'/%3E%3C/svg%3E") center / contain no-repeat;
+  animation: hop 1s ease-in-out infinite;
+}
+.loading::after { content: ""; order: -1; width: 40px; height: 6px; margin: 4px 0 14px; border-radius: 50%; background: var(--line); animation: hop-shadow 1s ease-in-out infinite; }
+@keyframes hop { 50% { transform: translateY(-14px); } }
+@keyframes hop-shadow { 50% { transform: scaleX(.55); opacity: .5; } }
+@media (prefers-reduced-motion: reduce) { .loading::before, .loading::after { animation: none; } }
 
 /* รายละเอียด */
 .details { margin: 0 0 20px; background: var(--surface); border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow); padding: 4px 16px; }

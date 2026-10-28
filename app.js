@@ -101,7 +101,7 @@ function setPlate(el, houseNo) {
 }
 
 function loadingBox(text) {
-  return h('div', { class: 'loading', text: text || 'กำลังโหลด…' });
+  return h('div', { class: 'loading', role: 'status', text: text || 'กำลังโหลด…' });
 }
 
 function errorBox(message) {
