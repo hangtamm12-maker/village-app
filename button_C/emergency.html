@@ -91,7 +91,7 @@ App.register('emergency', {
       const err = h('div', { class: 'form-error', role: 'alert' });
       const btn = h('button', { class: 'btn', type: 'submit', text: 'ส่งเรื่อง' });
       let point = '';
-      const mapEl = placeMap(data.map, data.isAdmin, (v) => { point = v; });
+      const mapEl = placeMap(data.map, (v) => { point = v; });
       const form = h('form', { novalidate: true },
         h('div', { class: 'status bad' },
           h('p', { text: 'เหตุอันตรายต่อชีวิตหรือทรัพย์สิน กรุณาโทรจากแท็บ "แจ้งเหตุฉุกเฉิน" ทันที' })),
@@ -153,12 +153,10 @@ App.register('emergency', {
         i.note ? h('p', { class: 'small', text: 'หมายเหตุจากผู้ดูแล: ' + i.note }) : null);
     }
 
-    /** แผนที่จริง ภาพดาวเทียม Esri หรือถนน OpenStreetMap (ไม่ต้องใช้ API key) แตะเพื่อปักหมุด แล้วส่งลิงก์ Google Maps ของจุดนั้นให้ onPick
-     *  ผู้ดูแลลากหมุดอุปกรณ์ไปจุดจริงได้ ตำแหน่งใหม่บันทึกลงชีต MapPins ทันที */
-    function placeMap(map, isAdmin, onPick) {
-      const hint = 'เลื่อนและซูมไปยังจุดเกิดเหตุ แล้วแตะเพื่อปักหมุด หรือแตะหมุดอุปกรณ์ที่ชำรุด' +
-        (isAdmin ? ' (ผู้ดูแล: ลากหมุดอุปกรณ์เพื่อแก้ตำแหน่ง)' : '');
-      const info = h('p', { class: 'map-info', 'aria-live': 'polite', text: hint });
+    /** แผนที่จริง ภาพดาวเทียม Esri หรือแผนที่ถนน Esri (ไม่ต้องใช้ API key) แตะเพื่อปักหมุด แล้วส่งลิงก์ Google Maps ของจุดนั้นให้ onPick
+     *  หมุดอุปกรณ์ใช้พิกัดจริง lat,lng จากชีต MapPins */
+    function placeMap(map, onPick) {
+      const info = h('p', { class: 'map-info', 'aria-live': 'polite', text: 'เลื่อนและซูมไปยังจุดเกิดเหตุ แล้วแตะเพื่อปักหมุด หรือแตะหมุดอุปกรณ์ที่ชำรุด' });
       if (!window.L) {
         info.textContent = 'โหลดแผนที่ไม่สำเร็จ กรุณาระบุสถานที่ในช่องด้านล่างแทน';
         return info;
@@ -173,8 +171,9 @@ App.register('emergency', {
       const sat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
         maxZoom: 19, maxNativeZoom: 18, attribution: 'Imagery &copy; Esri',
       }).addTo(lmap);
-      const osm = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+      // แผนที่ถนนของ Esri (ฟรี ไม่ต้องใช้ key) แทน OpenStreetMap ซึ่งบล็อกแอปที่ส่ง Referer ไม่ครบตามนโยบายของเขา
+      const osm = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
+        maxZoom: 19, maxNativeZoom: 18, attribution: 'Tiles &copy; Esri',
       });
       L.control.layers({ 'ดาวเทียม': sat, 'ถนน': osm }, null, { position: 'topright' }).addTo(lmap);
 
@@ -187,6 +186,10 @@ App.register('emergency', {
           h('i', { class: 't-' + PIN_KEYS[type] }), type));
       });
 
+      (CONFIG.MAP_LANDMARKS || []).forEach((l) =>
+        L.circleMarker([l.lat, l.lng], { radius: 6, color: '#fff', weight: 2, fillColor: '#6b4f2a', fillOpacity: 1, interactive: false })
+          .bindTooltip(l.name, { permanent: true, direction: 'top', offset: [0, -6] }).addTo(lmap));
+
       // แถวที่ยังไม่มีพิกัดจริง แปลงจาก x,y % ของแผนผังเดิมด้วยจุดอ้างอิง 3 จุดใน config.js
       const toLL = xyToLatLng(CONFIG.MAP_REF);
       map.pins.forEach((p) => {
@@ -197,22 +200,9 @@ App.register('emergency', {
           return;
         }
         const key = PIN_KEYS[p.type];
-        let home = pts[0];
-        const m = L.marker(home, { title: `${p.type} ${p.name}`, draggable: isAdmin,
+        const m = L.marker(pts[0], { title: `${p.type} ${p.name}`,
           icon: L.divIcon({ className: 'pin t-' + key, iconSize: [34, 34], html: icon(key) }) })
           .on('click', () => pick(m.getLatLng(), p))
-          .on('dragend', async () => {
-            const { lat, lng } = m.getLatLng();
-            info.textContent = `กำลังบันทึกตำแหน่ง ${p.type} ${p.name}…`;
-            try {
-              await App.api('adminSetPin', { type: p.type, name: p.name, lat, lng });
-              home = m.getLatLng();
-              info.textContent = `บันทึกตำแหน่ง ${p.type} ${p.name} แล้ว`;
-            } catch (err) {
-              m.setLatLng(home);
-              info.textContent = err.message;
-            }
-          })
           .addTo(layers[p.type]);
       });
 
@@ -231,7 +221,7 @@ App.register('emergency', {
     }
 
     /** x,y % บนแผนผังเดิม → [lat, lng] จากจุดอ้างอิง 3 จุด: ค่า = p + b·(x−p.x) + c·(y−p.y)
-     *  shortcut: แผนผังเดิมวาดไม่ตรงมาตราส่วน คลาดได้หลายเมตร ผู้ดูแลลากหมุดเพื่อบันทึกพิกัดจริงแทน */
+     *  shortcut: แผนผังเดิมวาดไม่ตรงมาตราส่วน คลาดได้หลายเมตร ใส่พิกัดจริงในชีตแทน */
     function xyToLatLng(ref) {
       if (!ref) return null;
       const [p, q, r] = ref;
