@@ -7,6 +7,16 @@
   <p class="lead">ลงชื่อครั้งเดียวต่อบ้าน สมาชิกคนใดในบ้านลงชื่อก็ได้ ลงชื่อได้ถึงวันประชุมเท่านั้น</p>
   <div id="checkin-msg" role="alert"></div>
   <div id="checkin-body"></div>
+
+  <!-- สแกนด้วยกล้องของเครื่องผ่านหน้าเว็บ: ใช้เมื่อกล้องของ LINE (scanCodeV2) ใช้ไม่ได้ -->
+  <dialog class="qr-dialog" id="scan-dialog" aria-labelledby="scan-title">
+    <h2 id="scan-title">สแกน QR code ที่หน้างาน</h2>
+    <video id="scan-video" playsinline muted hidden style="width:100%;margin:12px 0;border-radius:12px;background:#000"></video>
+    <p class="small" id="scan-msg" role="status"></p>
+    <label class="btn btn-ghost" for="scan-photo">ถ่ายรูป QR code แทน</label>
+    <input type="file" id="scan-photo" accept="image/*" capture="environment" hidden>
+    <form method="dialog" style="margin-top:12px"><button class="btn btn-ghost">ยกเลิก</button></form>
+  </dialog>
 </section>
 
 <script>
@@ -22,6 +32,98 @@ function checkinFromQr(value) {
   const state = q.get('liff.state');
   if (state) q = new URLSearchParams(state.slice(state.indexOf('?') + 1));
   return q.get('page') === 'checkin' && q.get('m') ? { meetingId: q.get('m'), key: q.get('k') || '' } : null;
+}
+
+/** โหลดตัวอ่าน QR จากภาพ ครั้งแรกที่ต้องใช้กล้องผ่านหน้าเว็บเท่านั้น */
+function loadJsQr() {
+  if (window.jsQR) return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js';
+    s.onload = resolve;
+    s.onerror = () => reject(new Error('โหลดตัวอ่าน QR ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง'));
+    document.head.append(s);
+  });
+}
+
+/** อ่าน QR จากภาพ/เฟรมวิดีโอ (ย่อให้กว้างไม่เกิน max px ให้อ่านเร็ว) → ข้อความใน QR หรือ '' */
+function readQr(source, w, h, max) {
+  const scale = Math.min(1, max / Math.max(w, h));
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.round(w * scale);
+  canvas.height = Math.round(h * scale);
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  ctx.drawImage(source, 0, 0, canvas.width, canvas.height);
+  const code = jsQR(ctx.getImageData(0, 0, canvas.width, canvas.height).data, canvas.width, canvas.height);
+  return code ? code.data : '';
+}
+
+/**
+ * เปิดกล้องของเครื่องในหน้าเว็บแล้วอ่าน QR → ข้อความใน QR ('' = ยกเลิก)
+ * กล้องสดเปิดไม่ได้ (เบราว์เซอร์ใน LINE บางเครื่อง/ไม่อนุญาต) → ถ่ายรูป QR ด้วยแอปกล้องแทน
+ */
+async function webScanQr() {
+  await loadJsQr();
+  const dlg = $('scan-dialog');
+  const video = $('scan-video');
+  const msg = $('scan-msg');
+  const photo = $('scan-photo');
+  let stream = null;
+  let raf = 0;
+  return new Promise((resolve) => {
+    let done = false;
+    const finish = (value) => {
+      if (done) return;
+      done = true;
+      cancelAnimationFrame(raf);
+      if (stream) stream.getTracks().forEach((t) => t.stop());
+      video.srcObject = null;
+      photo.onchange = null;
+      if (dlg.open) dlg.close();
+      resolve(value);
+    };
+    dlg.addEventListener('close', () => finish(''), { once: true });
+    photo.value = '';
+    photo.onchange = () => {
+      const file = photo.files[0];
+      if (!file) return;
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+      img.onload = () => {
+        URL.revokeObjectURL(url);
+        const value = readQr(img, img.naturalWidth, img.naturalHeight, 1200);
+        if (value) finish(value);
+        else msg.textContent = 'อ่าน QR code จากรูปไม่ได้ ลองถ่ายใหม่ให้ QR ชัดและอยู่กลางภาพ';
+      };
+      img.onerror = () => { msg.textContent = 'เปิดรูปไม่ได้ ลองถ่ายใหม่อีกครั้ง'; };
+      img.src = url;
+    };
+    msg.textContent = 'กำลังเปิดกล้อง… ถ้ากล้องไม่ขึ้น กดปุ่ม "ถ่ายรูป QR code แทน" ด้านล่าง';
+    video.hidden = true;
+    dlg.showModal();
+
+    const tick = () => {
+      if (done) return;
+      if (video.readyState >= 2) {
+        const value = readQr(video, video.videoWidth, video.videoHeight, 640);
+        if (value) return finish(value);
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    Promise.resolve()
+      .then(() => navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false }))
+      .then((s) => {
+        stream = s;
+        if (done) return finish('');
+        video.srcObject = s;
+        video.hidden = false;
+        msg.textContent = 'หันกล้องไปที่ QR code';
+        return video.play().then(tick);
+      })
+      .catch(() => {
+        if (!done) msg.textContent = 'เปิดกล้องในหน้านี้ไม่ได้ กดปุ่ม "ถ่ายรูป QR code แทน" ด้านล่าง';
+      });
+  });
 }
 
 App.register('checkin', {
@@ -172,18 +274,16 @@ App.register('checkin', {
 
     /** เปิดกล้องสแกน QR ของประชุมนี้ → รหัสลับใน QR ('' = กดยกเลิก) */
     async function scanKey(meetingId) {
-      if (!canScan()) {
-        // กล้องของ LINE ใช้ได้เฉพาะหน้าที่เปิดผ่านลิงก์ liff.line.me ในแอป LINE บนมือถือ
-        throw new Error(liff.isInClient()
-          ? 'แอป LINE ในเครื่องนี้เปิดกล้องสแกนไม่ได้ กรุณาอัปเดตแอป LINE แล้วลองใหม่ หรือสแกน QR code ที่หน้างานด้วยกล้องมือถือ'
-          : 'หน้านี้ไม่ได้เปิดในแอป LINE จึงเปิดกล้องไม่ได้ กรุณาเปิดจากเมนูในแชท LINE ของหมู่บ้าน หรือสแกน QR code ที่หน้างานด้วยกล้องมือถือ');
+      // กล้องของ LINE ก่อน (ใช้ได้เฉพาะหน้าที่เปิดผ่าน liff.line.me ในแอป LINE) ใช้ไม่ได้ → กล้องของเครื่องผ่านหน้าเว็บ
+      let value = null;
+      if (canScan()) {
+        try {
+          value = (await liff.scanCodeV2()).value || '';
+        } catch (_) {
+          value = null;
+        }
       }
-      let value;
-      try {
-        value = (await liff.scanCodeV2()).value;
-      } catch (_) {
-        throw new Error('เปิดกล้องสแกนไม่สำเร็จ ลองสแกนด้วยกล้องมือถือแทน');
-      }
+      if (value === null) value = await webScanQr();
       if (!value) return '';
       const qr = checkinFromQr(value);
       if (!qr) throw new Error('QR code นี้ไม่ใช่ QR สำหรับลงชื่อประชุม');
