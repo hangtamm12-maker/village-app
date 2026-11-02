@@ -52,13 +52,15 @@ App.register('admin-qr', {
           h('span', {},
             h('span', { class: 'muted', text: fmtDateLong(x.date) + (x.time ? ` ${x.time} น.` : '') + ' · ' }),
             x.title))));
-      const toggle = h('button', { type: 'button', 'aria-label': 'การประชุมที่จะมาถึง', title: 'การประชุมที่จะมาถึง',
-        'aria-expanded': 'false', 'aria-controls': 'qr-pick', text: '📅',
-        style: 'font-size:22px;background:none;border:0;padding:4px;margin:0 0 8px;cursor:pointer',
+      const toggle = h('button', { type: 'button', title: 'การประชุมที่จะมาถึง',
+        'aria-expanded': 'false', 'aria-controls': 'qr-pick',
+        style: 'display:flex;align-items:center;gap:6px;font:inherit;color:var(--muted);background:none;border:0;padding:4px 0;margin:0 0 8px;cursor:pointer',
         onclick: () => {
           list.hidden = !list.hidden;
           toggle.setAttribute('aria-expanded', String(!list.hidden));
-        } });
+        } },
+        h('span', { style: 'font-size:22px', 'aria-hidden': 'true', text: '📅' }),
+        h('span', { class: 'small', style: 'text-decoration:underline', text: 'เลือกการประชุม' }));
       list.append(h('button', { class: 'btn btn-ghost', type: 'button', style: 'margin-top:8px', text: 'generate QR code ล่วงหน้า', onclick: () => {
         showQr(body, upcoming[Number(list.querySelector('input:checked').value)]);
         list.hidden = true;
