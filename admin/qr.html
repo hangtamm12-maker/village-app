@@ -1,0 +1,70 @@
+<link rel="stylesheet" href="styles.css?v=7">
+<section id="page-admin-qr" hidden>
+  <div class="topbar">
+    <button class="back" type="button" data-go="admin"><svg data-icon="back"></svg>สำหรับผู้ดูแล</button>
+  </div>
+  <h1>QR ลงชื่อประชุม</h1>
+  <div id="qr-body"></div>
+</section>
+
+<script>
+/** ลิงก์ใน QR: ต้องมีรหัสลับ k (ได้จากหลังบ้านเฉพาะผู้ดูแล) ลูกบ้านจึงลงชื่อได้ — เหมือน checkinQrUrl_ ใน Admin.gs */
+function checkinQrUrl(m) {
+  return `https://liff.line.me/${CONFIG.LIFF_ID}?page=checkin&m=${encodeURIComponent(m.id)}&k=${encodeURIComponent(m.qrKey)}`;
+}
+
+/** โหลดตัวสร้าง QR ครั้งแรกที่เปิดหน้านี้เท่านั้น */
+function loadQrLib() {
+  if (window.qrcode) return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js';
+    s.onload = resolve;
+    s.onerror = () => reject(new Error('โหลดตัวสร้าง QR ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง'));
+    document.head.append(s);
+  });
+}
+
+App.register('admin-qr', {
+  adminOnly: true,
+
+  async enter() {
+    const body = $('qr-body');
+    fill(body, loadingBox('กำลังโหลดการประชุม…'));
+
+    let m;
+    try {
+      // หลังบ้านให้ qrKey เฉพาะประชุมที่เปิดลงชื่อวันนี้และที่ยังไม่ถึงวัน เรียงตามวันที่ → ตัวแรก = วันนี้ ถ้าไม่มีใช้ครั้งถัดไป
+      m = (await App.api('meetings')).meetings.find((x) => x.qrKey);
+      if (m) await loadQrLib();
+    } catch (err) {
+      fill(body, errorBox(err.message));
+      return;
+    }
+    if (!m) {
+      fill(body, h('div', { class: 'card empty' },
+        h('p', { text: 'ยังไม่มีการประชุมวันนี้หรือที่กำลังจะมาถึง' }),
+        h('p', { class: 'small', text: 'เพิ่มการประชุมในชีต Meetings และติ๊ก "เปิดลงชื่อ" ในวันประชุม' })));
+      return;
+    }
+
+    const qr = qrcode(0, 'M');
+    qr.addData(checkinQrUrl(m));
+    qr.make();
+    const box = h('div', { class: 'qr-box' });
+    // svg จากไลบรารี (escape ข้อความ alt ให้แล้ว)
+    box.innerHTML = qr.createSvgTag({ cellSize: 8, margin: 4, scalable: true, alt: 'QR ลงชื่อ ' + m.title });
+
+    fill(body, h('div', { class: 'card', style: 'text-align:center' },
+      h('h2', { style: 'margin:0 0 4px', text: m.title }),
+      h('p', { class: 'muted small', text: [fmtDateLong(m.date), m.time ? `เวลา ${m.time} น.` : ''].filter(Boolean).join(' ') }),
+      m.place ? h('p', { class: 'small', text: 'สถานที่ ' + m.place }) : null,
+      box,
+      h('p', { class: 'small', text: 'สแกนด้วยกล้องมือถือ หรือกดปุ่ม "ลงชื่อเข้าร่วมประชุม" ในหน้าลงชื่อ' }),
+      m.early
+        ? h('div', { class: 'status wait', style: 'margin:12px 0 0' },
+          h('p', { text: 'ยังไม่ถึงวันประชุม ลูกบ้านสแกนลงชื่อได้ในวันประชุมเมื่อติ๊ก "เปิดลงชื่อ" แล้ว' }))
+        : null));
+  },
+});
+</script>

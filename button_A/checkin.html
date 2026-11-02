@@ -7,15 +7,6 @@
   <p class="lead">ลงชื่อครั้งเดียวต่อบ้าน สมาชิกคนใดในบ้านลงชื่อก็ได้ ลงชื่อได้ถึงวันประชุมเท่านั้น</p>
   <div id="checkin-msg" role="alert"></div>
   <div id="checkin-body"></div>
-
-  <!-- ผู้ดูแลเปิด QR ให้ลูกบ้านสแกนที่หน้างาน -->
-  <dialog class="qr-dialog" id="checkin-qr" aria-labelledby="checkin-qr-title">
-    <h2 id="checkin-qr-title"></h2>
-    <p class="muted small" id="checkin-qr-date"></p>
-    <div class="qr-box" id="checkin-qr-img"></div>
-    <p class="small">สแกนด้วยกล้องมือถือ หรือกดปุ่ม "ลงชื่อเข้าร่วมประชุม" ในหน้าลงชื่อ</p>
-    <form method="dialog"><button class="btn">ปิด</button></form>
-  </dialog>
 </section>
 
 <script>
@@ -31,22 +22,6 @@ function checkinFromQr(value) {
   const state = q.get('liff.state');
   if (state) q = new URLSearchParams(state.slice(state.indexOf('?') + 1));
   return q.get('page') === 'checkin' && q.get('m') ? { meetingId: q.get('m'), key: q.get('k') || '' } : null;
-}
-
-function checkinQrUrl(m) {
-  return `https://liff.line.me/${CONFIG.LIFF_ID}?page=checkin&m=${encodeURIComponent(m.id)}&k=${encodeURIComponent(m.qrKey)}`;
-}
-
-/** โหลดตัวสร้าง QR ตอนผู้ดูแลกดแสดง QR ครั้งแรกเท่านั้น */
-function loadQrLib() {
-  if (window.qrcode) return Promise.resolve();
-  return new Promise((resolve, reject) => {
-    const s = document.createElement('script');
-    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js';
-    s.onload = resolve;
-    s.onerror = () => reject(new Error('โหลดตัวสร้าง QR ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง'));
-    document.head.append(s);
-  });
 }
 
 App.register('checkin', {
@@ -103,11 +78,7 @@ App.register('checkin', {
 
       fill(body, banner, plate, list.map((m) => meetingCard(m, {
         hideDetail: true,
-        action: h('div', {}, actionFor(m),
-          // ผู้ดูแลเปิด QR ได้ตั้งแต่ก่อนวันประชุม (พิมพ์ติดไว้ล่วงหน้าได้)
-          m.qrKey
-            ? h('button', { class: 'btn btn-ghost', type: 'button', text: 'แสดง QR ให้ลูกบ้านสแกน', onclick: () => showQr(m) })
-            : null),
+        action: actionFor(m),
       })));
     }
 
@@ -219,23 +190,6 @@ App.register('checkin', {
       if (qr.meetingId !== meetingId) throw new Error('QR code นี้เป็นของการประชุมอื่น');
       if (!qr.key) throw new Error('QR code นี้เป็นแบบเก่า กรุณาแจ้งผู้ดูแลให้พิมพ์ QR ใหม่');
       return qr.key;
-    }
-
-    async function showQr(m) {
-      try {
-        await loadQrLib();
-      } catch (e) {
-        fill(msg, errorBox(e.message));
-        return;
-      }
-      const qr = qrcode(0, 'M');
-      qr.addData(checkinQrUrl(m));
-      qr.make();
-      // svg จากไลบรารี (escape ข้อความ alt ให้แล้ว)
-      $('checkin-qr-img').innerHTML = qr.createSvgTag({ cellSize: 8, margin: 4, scalable: true, alt: 'QR ลงชื่อ ' + m.title });
-      $('checkin-qr-title').textContent = m.title;
-      $('checkin-qr-date').textContent = [fmtDateLong(m.date), m.time ? `เวลา ${m.time} น.` : ''].filter(Boolean).join(' ');
-      $('checkin-qr').showModal();
     }
   },
 });
