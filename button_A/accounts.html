@@ -4,6 +4,10 @@
     <button class="back" type="button" data-go="menu"><svg data-icon="back"></svg>เมนูหลัก</button>
   </div>
   <h1>รายงานบัญชีหมู่บ้าน</h1>
+  <div class="field" id="acc-book-field" hidden>
+    <label class="lbl" for="acc-book">สมุดบัญชี</label>
+    <select id="acc-book"></select>
+  </div>
   <div class="field" id="acc-year-field" hidden>
     <label class="lbl" for="acc-year">ปีบัญชี</label>
     <select id="acc-year"></select>
@@ -20,14 +24,17 @@
     enter() { load(); },
   });
 
-  $('acc-year').addEventListener('change', (e) => load(e.target.value));
+  // เปลี่ยนบัญชี/ปี → โหลดใหม่ตามที่เลือกทั้งสองช่อง
+  const reload = () => load(Number($('acc-year').value) || null, $('acc-book').value);
+  $('acc-year').addEventListener('change', reload);
+  $('acc-book').addEventListener('change', reload);
 
-  async function load(year) {
+  async function load(year, book) {
     const no = ++requestNo;
     const body = $('acc-body');
     fill(body, loadingBox('กำลังสรุปยอดบัญชี…'));
     try {
-      const res = await App.api('accounts', { year: year ? Number(year) : null });
+      const res = await App.api('accounts', { year: year || null, book: book || '' });
       if (no !== requestNo) return; // ผู้ใช้เปลี่ยนปีระหว่างโหลด
       render(res);
     } catch (err) {
@@ -40,6 +47,11 @@
     select.replaceChildren(...res.years.map((y) =>
       h('option', { value: y, selected: y === res.year, text: `พ.ศ. ${y + 543}` })));
     $('acc-year-field').hidden = false;
+    // บัญชีเดียว (หรือยังไม่มี) ไม่ต้องให้เลือก
+    $('acc-book').replaceChildren(h('option', { value: '', text: 'ทุกบัญชี' }),
+      ...res.books.map((b) => h('option', { value: b, selected: b === res.book, text: b })));
+    $('acc-book-field').hidden = res.books.length < 2;
+    const bookName = res.book || (res.books.length > 1 ? 'ทุกบัญชี' : '');
 
     const t = res.totals;
     const thisYear = new Date().getFullYear();
@@ -54,11 +66,21 @@
     fill($('acc-body'), 
       h('div', { class: 'summary' },
         h('div', { class: 'wide' },
-          h('span', { text: res.year === thisYear ? 'เงินคงเหลือปัจจุบัน (บาท)' : `เงินคงเหลือสิ้นปี ${res.year + 543} (บาท)` }),
+          h('span', { text: (res.year === thisYear ? 'เงินคงเหลือปัจจุบัน' : `เงินคงเหลือสิ้นปี ${res.year + 543}`)
+            + (bookName ? ` · ${bookName}` : '') + ' (บาท)' }),
           h('b', { text: money(t.closing) })),
         h('div', {}, h('span', { text: 'รายรับทั้งปี' }), h('b', { class: 'in', text: money(t.income) })),
         h('div', {}, h('span', { text: 'รายจ่ายทั้งปี' }), h('b', { class: 'out', text: money(t.expense) }))),
-      h('p', { class: 'muted small', text: `ยอดยกมาจากปีก่อน ${money(t.opening)} บาท` }),
+      h('p', { class: 'muted small', text: `ยอดยกมาจากปีก่อน ${money(t.opening)} บาท`
+        + (t.transferIn || t.transferOut ? ` · โอนเข้า ${money(t.transferIn)} · โอนออก ${money(t.transferOut)} บาท` : '') }),
+
+      // ทุกบัญชี: ยอดคงเหลือของแต่ละสมุดบัญชี
+      !res.book && res.books.length > 1
+        ? h('div', {},
+          h('h2', { text: 'ยอดคงเหลือแต่ละบัญชี' }),
+          h('ul', { class: 'cats books' }, res.balances.map((b) => h('li', {},
+            h('div', { class: 'row' }, h('span', { text: b.name }), h('b', { text: money(b.balance) }))))))
+        : null,
 
       h('h2', { text: 'สรุปรายเดือน' }),
       shownMonths.length
