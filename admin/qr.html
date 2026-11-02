@@ -34,26 +34,37 @@ App.register('admin-qr', {
     fill($('qr-upcoming'));
     fill(body, loadingBox('กำลังโหลดการประชุม…'));
 
-    let m;
     let upcoming;
     try {
-      // หลังบ้านเรียงตามวันที่ และให้ qrKey เฉพาะประชุมที่เปิดลงชื่อวันนี้และที่ยังไม่ถึงวัน → ตัวแรก = วันนี้ ถ้าไม่มีใช้ครั้งถัดไป
-      const meetings = (await App.api('meetings')).meetings;
-      m = meetings.find((x) => x.qrKey);
-      upcoming = meetings.filter((x) => !x.expired && x !== m);
-      if (m) await loadQrLib();
+      // หลังบ้านเรียงตามวันที่ และให้ qrKey เฉพาะประชุมที่เปิดลงชื่อวันนี้และที่ยังไม่ถึงวัน → ตัวแรก = ครั้งที่ใกล้ที่สุด
+      upcoming = (await App.api('meetings')).meetings.filter((x) => x.qrKey);
+      if (upcoming.length) await loadQrLib();
     } catch (err) {
       fill(body, errorBox(err.message));
       return;
     }
-    // การประชุมครั้งต่อ ๆ ไป (นอกจากที่แสดง QR) แบบย่อ: วันที่ · ชื่อ
-    if (upcoming.length) {
-      fill($('qr-upcoming'),
-        h('p', { class: 'muted small', style: 'margin:0 0 4px', text: 'การประชุมที่จะมาถึง' }),
-        h('ul', { class: 'small', style: 'list-style:none;margin:0 0 16px;padding:0' },
-          upcoming.map((x) => h('li', { style: 'padding:2px 0' },
+    const m = upcoming[0];
+    // 📅 แตะแล้วเห็นรายการประชุมที่จะมาถึง เลือกครั้งไหนก็สร้าง QR ล่วงหน้าได้ (ค่าเริ่มต้น = ครั้งที่ใกล้ที่สุด)
+    if (upcoming.length > 1) {
+      const list = h('div', { id: 'qr-pick', class: 'small', style: 'margin:0 0 16px', hidden: true },
+        upcoming.map((x, i) => h('label', { style: 'display:flex;gap:8px;align-items:baseline;padding:4px 0' },
+          h('input', { type: 'radio', name: 'qr-meeting', value: i, checked: x === m }),
+          h('span', {},
             h('span', { class: 'muted', text: fmtDateLong(x.date) + (x.time ? ` ${x.time} น.` : '') + ' · ' }),
             x.title))));
+      const toggle = h('button', { type: 'button', 'aria-label': 'การประชุมที่จะมาถึง', title: 'การประชุมที่จะมาถึง',
+        'aria-expanded': 'false', 'aria-controls': 'qr-pick', text: '📅',
+        style: 'font-size:22px;background:none;border:0;padding:4px;margin:0 0 8px;cursor:pointer',
+        onclick: () => {
+          list.hidden = !list.hidden;
+          toggle.setAttribute('aria-expanded', String(!list.hidden));
+        } });
+      list.append(h('button', { class: 'btn btn-ghost', type: 'button', style: 'margin-top:8px', text: 'generate QR code ล่วงหน้า', onclick: () => {
+        showQr(body, upcoming[Number(list.querySelector('input:checked').value)]);
+        list.hidden = true;
+        toggle.setAttribute('aria-expanded', 'false');
+      } }));
+      fill($('qr-upcoming'), toggle, list);
     }
     if (!m) {
       fill(body, h('div', { class: 'card empty' },
@@ -61,7 +72,12 @@ App.register('admin-qr', {
         h('p', { class: 'small', text: 'เพิ่มการประชุมในชีต Meetings และติ๊ก "เปิดลงชื่อ" ในวันประชุม' })));
       return;
     }
+    showQr(body, m);
+  },
+});
 
+/** การ์ด QR ของประชุม m (มี qrKey) */
+function showQr(body, m) {
     const qr = qrcode(0, 'M');
     qr.addData(checkinQrUrl(m));
     qr.make();
@@ -79,6 +95,5 @@ App.register('admin-qr', {
         ? h('div', { class: 'status wait', style: 'margin:12px 0 0' },
           h('p', { text: 'ยังไม่ถึงวันประชุม ลูกบ้านสแกนลงชื่อได้ในวันประชุมเมื่อติ๊ก "เปิดลงชื่อ" แล้ว' }))
         : null));
-  },
-});
+}
 </script>
