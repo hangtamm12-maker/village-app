@@ -1,11 +1,10 @@
-<link rel="stylesheet" href="styles.css?v=6">
+<link rel="stylesheet" href="styles.css?v=7">
 <section id="page-checkin" hidden>
   <div class="topbar">
     <button class="back" type="button" data-go="menu"><svg data-icon="back"></svg>เมนูหลัก</button>
   </div>
   <h1>ลงชื่อเข้าร่วมประชุม</h1>
   <p class="lead">ลงชื่อครั้งเดียวต่อบ้าน สมาชิกคนใดในบ้านลงชื่อก็ได้ ลงชื่อได้ถึงวันประชุมเท่านั้น</p>
-  <button class="btn" id="checkin-scan" type="button" hidden>สแกน QR code ที่หน้างาน</button>
   <div id="checkin-msg" role="alert"></div>
   <div id="checkin-body"></div>
 
@@ -14,28 +13,28 @@
     <h2 id="checkin-qr-title"></h2>
     <p class="muted small" id="checkin-qr-date"></p>
     <div class="qr-box" id="checkin-qr-img"></div>
-    <p class="small">สแกนด้วยกล้องมือถือ หรือกดปุ่ม "สแกน QR code" ในหน้าลงชื่อ</p>
+    <p class="small">สแกนด้วยกล้องมือถือ หรือกดปุ่ม "ลงชื่อเข้าร่วมประชุม" ในหน้าลงชื่อ</p>
     <form method="dialog"><button class="btn">ปิด</button></form>
   </dialog>
 </section>
 
 <script>
-/** ค่าจาก QR → รหัสประชุม รับเฉพาะลิงก์ ?page=checkin&m=... (รวมลิงก์ liff.line.me ที่ค่าอยู่ใน liff.state) */
-function meetingIdFromQr(value) {
+/** ค่าจาก QR → { meetingId, key } รับเฉพาะลิงก์ ?page=checkin&m=... (รวมลิงก์ liff.line.me ที่ค่าอยู่ใน liff.state) */
+function checkinFromQr(value) {
   let url;
   try {
     url = new URL(value);
   } catch (_) {
-    return '';
+    return null;
   }
   let q = url.searchParams;
   const state = q.get('liff.state');
   if (state) q = new URLSearchParams(state.slice(state.indexOf('?') + 1));
-  return q.get('page') === 'checkin' ? (q.get('m') || '') : '';
+  return q.get('page') === 'checkin' && q.get('m') ? { meetingId: q.get('m'), key: q.get('k') || '' } : null;
 }
 
-function checkinQrUrl(meetingId) {
-  return `https://liff.line.me/${CONFIG.LIFF_ID}?page=checkin&m=${encodeURIComponent(meetingId)}`;
+function checkinQrUrl(m) {
+  return `https://liff.line.me/${CONFIG.LIFF_ID}?page=checkin&m=${encodeURIComponent(m.id)}&k=${encodeURIComponent(m.qrKey)}`;
 }
 
 /** โหลดตัวสร้าง QR ตอนผู้ดูแลกดแสดง QR ครั้งแรกเท่านั้น */
@@ -57,12 +56,8 @@ App.register('checkin', {
     const body = $('checkin-body');
     const msg = $('checkin-msg');
     const wantedId = params.meetingId || '';
-    const isAdmin = App.isAdmin();
-    const buttons = {};
+    const checkins = {};
 
-    const scan = $('checkin-scan');
-    scan.hidden = !canScan();
-    scan.onclick = scanQr;
     fill(msg);
     fill(body, loadingBox('กำลังโหลดการประชุม…'));
 
@@ -75,8 +70,8 @@ App.register('checkin', {
     }
     render(res, null);
 
-    // มาจาก QR (กล้องมือถือหรือปุ่มสแกน) → ลงชื่อให้ทันทีถ้ายังเปิดลงชื่อและบ้านยังไม่ได้ลงชื่อ
-    if (params.qr && buttons[wantedId]) buttons[wantedId].click();
+    // สแกน QR ด้วยกล้องมือถือ (ลิงก์มี k=) → ลงชื่อให้ทันทีถ้ายังเปิดลงชื่อและบ้านยังไม่ได้ลงชื่อ
+    if (params.key && checkins[wantedId]) checkins[wantedId](params.key);
 
     function render(r, justCheckedIn) {
       const meetings = r.meetings || [];
@@ -110,7 +105,7 @@ App.register('checkin', {
         hideDetail: true,
         action: h('div', {}, actionFor(m),
           // ผู้ดูแลเปิด QR ได้ตั้งแต่ก่อนวันประชุม (พิมพ์ติดไว้ล่วงหน้าได้)
-          isAdmin && (m.open || m.early)
+          m.qrKey
             ? h('button', { class: 'btn btn-ghost', type: 'button', text: 'แสดง QR ให้ลูกบ้านสแกน', onclick: () => showQr(m) })
             : null),
       })));
@@ -139,21 +134,32 @@ App.register('checkin', {
       }
       const err = h('div', { class: 'err' });
       const btn = h('button', { class: 'btn', type: 'button', text: 'ลงชื่อเข้าร่วมประชุม' });
-      buttons[m.id] = btn;
-      btn.addEventListener('click', async () => {
+      const submit = checkins[m.id] = async (key) => {
         btn.disabled = true;
         btn.textContent = 'กำลังลงชื่อ…';
         err.textContent = '';
         try {
-          render(await App.api('checkin', { meetingId: m.id, via: params.qr ? 'qr' : '' }), m.id);
+          render(await App.api('checkin', { meetingId: m.id, key }), m.id);
           window.scrollTo(0, 0);
         } catch (e) {
           err.textContent = e.message;
           btn.disabled = false;
           btn.textContent = 'ลงชื่อเข้าร่วมประชุม';
         }
+      };
+      // ลงชื่อได้เฉพาะคนที่สแกน QR หน้างาน → กดแล้วเปิดกล้อง
+      btn.addEventListener('click', async () => {
+        err.textContent = '';
+        try {
+          const key = await scanKey(m.id);
+          if (key) submit(key);
+        } catch (e) {
+          err.textContent = e.message;
+        }
       });
-      return h('div', {}, btn, err, reminderBox(m));
+      return h('div', {}, btn,
+        h('p', { class: 'small muted', style: 'margin:8px 0 0', text: 'กดแล้วสแกน QR code ที่หน้างาน' }),
+        err, reminderBox(m));
     }
 
     /** เปิด/ปิดแจ้งเตือนทาง LINE (ค่าเริ่มต้นปิด) ได้ถึง 30 นาทีก่อนเริ่มประชุม หลังจากนั้นซ่อนปุ่ม */
@@ -193,22 +199,21 @@ App.register('checkin', {
       }
     }
 
-    async function scanQr() {
-      fill(msg);
+    /** เปิดกล้องสแกน QR ของประชุมนี้ → รหัสลับใน QR ('' = กดยกเลิก) */
+    async function scanKey(meetingId) {
+      if (!canScan()) throw new Error('เปิดกล้องในหน้านี้ไม่ได้ กรุณาสแกน QR code ที่หน้างานด้วยกล้องมือถือ');
       let value;
       try {
         value = (await liff.scanCodeV2()).value;
-      } catch (e) {
-        fill(msg, errorBox('เปิดกล้องสแกนไม่สำเร็จ ลองสแกนด้วยกล้องมือถือแทน'));
-        return;
+      } catch (_) {
+        throw new Error('เปิดกล้องสแกนไม่สำเร็จ ลองสแกนด้วยกล้องมือถือแทน');
       }
-      if (!value) return; // กดยกเลิก
-      const id = meetingIdFromQr(value);
-      if (!id) {
-        fill(msg, errorBox('QR code นี้ไม่ใช่ QR สำหรับลงชื่อประชุม'));
-        return;
-      }
-      App.go('checkin', { meetingId: id, qr: true });
+      if (!value) return '';
+      const qr = checkinFromQr(value);
+      if (!qr) throw new Error('QR code นี้ไม่ใช่ QR สำหรับลงชื่อประชุม');
+      if (qr.meetingId !== meetingId) throw new Error('QR code นี้เป็นของการประชุมอื่น');
+      if (!qr.key) throw new Error('QR code นี้เป็นแบบเก่า กรุณาแจ้งผู้ดูแลให้พิมพ์ QR ใหม่');
+      return qr.key;
     }
 
     async function showQr(m) {
@@ -219,7 +224,7 @@ App.register('checkin', {
         return;
       }
       const qr = qrcode(0, 'M');
-      qr.addData(checkinQrUrl(m.id));
+      qr.addData(checkinQrUrl(m));
       qr.make();
       // svg จากไลบรารี (escape ข้อความ alt ให้แล้ว)
       $('checkin-qr-img').innerHTML = qr.createSvgTag({ cellSize: 8, margin: 4, scalable: true, alt: 'QR ลงชื่อ ' + m.title });

@@ -332,6 +332,7 @@ i.t-pipe { background: var(--pipe); }
 .qr-dialog { width: min(92vw, 420px); padding: 20px; border: 0; border-radius: 16px; background: var(--surface); color: var(--ink); text-align: center; }
 .qr-dialog::backdrop { background: rgba(0, 0, 0, .6); }
 .qr-dialog h2 { margin: 0 0 4px; }
+.proxy-dialog { text-align: left; }
 .qr-box { margin: 12px 0; padding: 8px; border-radius: 12px; background: #fff; }
 .qr-box svg { display: block; width: 100%; height: auto; }
 
@@ -350,6 +351,8 @@ i.t-pipe { background: var(--pipe); }
 .btn-danger { color: var(--bad); border-color: var(--bad); }
 .report th, .report td { text-align: left; white-space: normal; }
 .absent { margin: 0; padding: 14px 16px; background: var(--surface); border: 1px solid var(--line); border-radius: 16px; line-height: 1.9; overflow-wrap: anywhere; }
+.absent .house { min-width: 56px; min-height: 44px; margin: 4px; padding: 0 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); color: var(--ink); font: inherit; cursor: pointer; }
+.absent .house:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
 
 /* ผังบุคลากร: รายการซ้อนกัน มีเส้นโยงจากหัวหน้าลงมาที่ผู้ช่วย */
 .org, .org ul { list-style: none; margin: 0; padding: 0; }

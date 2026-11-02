@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" integrity="sha512-h9FcoyWjHcOcmEVkxOfTLnmZFWIH0iZhZT1H2TbOq55xssQGEJHEaIm+PgoUaZbRvQTNTluNOEfb1ZRy6D3BOw==" crossorigin="anonymous">
-<link rel="stylesheet" href="styles.css?v=6">
+<link rel="stylesheet" href="styles.css?v=7">
 </head>
 <body>
 <main>
@@ -117,6 +117,7 @@ function returnUrl(target) {
   const q = new URLSearchParams();
   if (target.page) q.set('page', target.page);
   if (target.m) q.set('m', target.m);
+  if (target.k) q.set('k', target.k);
   return location.origin + location.pathname + (q.toString() ? '?' + q : '');
 }
 
@@ -129,7 +130,7 @@ function returnUrl(target) {
   App.show('view-landing');
 
   const params = startParams();
-  const target = { page: params.get('page') || '', m: params.get('m') || '' };
+  const target = { page: params.get('page') || '', m: params.get('m') || '', k: params.get('k') || '' };
 
   // ปุ่ม C: ดึงเบอร์ฉุกเฉินภายนอกทันทีโดยไม่รอเข้าสู่ระบบ
   const sosReady = target.page !== 'emergency' ? null : callApi({ action: 'sos' })
@@ -210,8 +211,8 @@ function returnUrl(target) {
     return;
   }
   await sosReady;
-  // qr: เปิดจากลิงก์ที่มี m= (QR ลงชื่อประชุม) — หน้าลงชื่อจะลงชื่อให้ทันที
-  if (target.page && App.pages[target.page]) App.go(target.page, { meetingId: target.m, qr: !!target.m });
+  // key: เปิดจาก QR ลงชื่อประชุม (มี k=) — หน้าลงชื่อจะลงชื่อให้ทันที
+  if (target.page && App.pages[target.page]) App.go(target.page, { meetingId: target.m, key: target.k });
   else App.go('menu');
 })();
 </script>
