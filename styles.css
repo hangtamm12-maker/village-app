@@ -342,6 +342,10 @@ i.t-pipe { background: var(--pipe); }
   border: 1px solid var(--line); border-radius: 50%; background: var(--surface); color: var(--muted); cursor: pointer;
 }
 .gear svg { display: block; width: 100%; height: 100%; }
+.gear { position: relative; }
+.gear + .gear { margin-left: 8px; }
+/* จุดแดงบนกระดิ่ง = มีข่าวที่ยังไม่ได้เปิดอ่าน */
+.bell .dot { position: absolute; top: 4px; right: 5px; width: 13px; height: 13px; border-radius: 50%; background: #e5252a; border: 2px solid var(--surface); }
 .gear:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
 
 /* หน้าผู้ดูแล */

@@ -8,13 +8,17 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" integrity="sha512-h9FcoyWjHcOcmEVkxOfTLnmZFWIH0iZhZT1H2TbOq55xssQGEJHEaIm+PgoUaZbRvQTNTluNOEfb1ZRy6D3BOw==" crossorigin="anonymous">
-<link rel="stylesheet" href="styles.css?v=7">
+<link rel="stylesheet" href="styles.css?v=8">
 </head>
 <body>
 <main>
   <header class="hello" id="hello" hidden>
     <img id="hello-pic" alt="">
     <div><span>สวัสดีครับ</span><strong id="hello-name"></strong></div>
+    <button class="gear bell" id="btn-news" type="button" data-go="news" aria-label="ข่าวสาร" title="ข่าวสาร" hidden>
+      <svg data-icon="bell"></svg>
+      <span class="dot" id="news-dot" hidden></span>
+    </button>
     <button class="gear" id="btn-admin" type="button" data-go="admin" aria-label="สำหรับผู้ดูแล" title="สำหรับผู้ดูแล" hidden>
       <svg data-icon="gear"></svg>
     </button>
@@ -205,6 +209,9 @@ function returnUrl(target) {
   else $('hello-pic').hidden = true;
   $('hello').hidden = false;
   $('btn-admin').hidden = !App.isAdmin();
+  $('btn-news').hidden = !App.isMember();
+  App.newsIds = res.newsIds || [];
+  App.updateNewsDot();
   if (oa) liff.getFriendship().then((f) => { $('friend-notice').hidden = f.friendFlag; }).catch(() => {});
 
   if (!App.me || App.me.status === STATUS.REJECTED) {
