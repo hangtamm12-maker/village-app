@@ -201,7 +201,12 @@ App.register('checkin', {
 
     /** เปิดกล้องสแกน QR ของประชุมนี้ → รหัสลับใน QR ('' = กดยกเลิก) */
     async function scanKey(meetingId) {
-      if (!canScan()) throw new Error('เปิดกล้องในหน้านี้ไม่ได้ กรุณาสแกน QR code ที่หน้างานด้วยกล้องมือถือ');
+      if (!canScan()) {
+        // กล้องของ LINE ใช้ได้เฉพาะหน้าที่เปิดผ่านลิงก์ liff.line.me ในแอป LINE บนมือถือ
+        throw new Error(liff.isInClient()
+          ? 'แอป LINE ในเครื่องนี้เปิดกล้องสแกนไม่ได้ กรุณาอัปเดตแอป LINE แล้วลองใหม่ หรือสแกน QR code ที่หน้างานด้วยกล้องมือถือ'
+          : 'หน้านี้ไม่ได้เปิดในแอป LINE จึงเปิดกล้องไม่ได้ กรุณาเปิดจากเมนูในแชท LINE ของหมู่บ้าน หรือสแกน QR code ที่หน้างานด้วยกล้องมือถือ');
+      }
       let value;
       try {
         value = (await liff.scanCodeV2()).value;
