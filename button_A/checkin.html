@@ -11,7 +11,9 @@
   <!-- สแกนด้วยกล้องของเครื่องผ่านหน้าเว็บ: ใช้เมื่อกล้องของ LINE (scanCodeV2) ใช้ไม่ได้ -->
   <dialog class="qr-dialog" id="scan-dialog" aria-labelledby="scan-title">
     <h2 id="scan-title">สแกน QR code ที่หน้างาน</h2>
-    <video id="scan-video" playsinline muted hidden style="width:100%;margin:12px 0;border-radius:12px;background:#000"></video>
+    <!-- iPhone ไม่วาด <video> ใน dialog (showModal) → วิดีโอซ่อนไว้ (ต้องอยู่ในหน้าจึงจะเล่น) แล้ววาดแต่ละเฟรมลง canvas ให้เห็นแทน -->
+    <video id="scan-video" autoplay playsinline muted style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none"></video>
+    <canvas id="scan-preview" width="640" height="480" hidden style="display:block;width:100%;height:auto;margin:12px 0;border-radius:12px;background:#000"></canvas>
     <p class="small" id="scan-msg" role="status"></p>
     <label class="btn btn-ghost" for="scan-photo">ถ่ายรูป QR code แทน</label>
     <input type="file" id="scan-photo" accept="image/*" capture="environment" hidden>
@@ -46,12 +48,13 @@ function loadJsQr() {
   });
 }
 
-/** อ่าน QR จากภาพ/เฟรมวิดีโอ (ย่อให้กว้างไม่เกิน max px ให้อ่านเร็ว) → ข้อความใน QR หรือ '' */
-function readQr(source, w, h, max) {
+/** วาดภาพ/เฟรมวิดีโอลง canvas (ย่อให้ด้านยาวไม่เกิน max px ให้อ่านเร็ว) แล้วอ่าน QR → ข้อความใน QR หรือ '' */
+function readQr(source, w, h, max, canvas = document.createElement('canvas')) {
   const scale = Math.min(1, max / Math.max(w, h));
-  const canvas = document.createElement('canvas');
-  canvas.width = Math.round(w * scale);
-  canvas.height = Math.round(h * scale);
+  const cw = Math.round(w * scale);
+  const ch = Math.round(h * scale);
+  if (canvas.width !== cw) canvas.width = cw;
+  if (canvas.height !== ch) canvas.height = ch;
   const ctx = canvas.getContext('2d', { willReadFrequently: true });
   ctx.drawImage(source, 0, 0, canvas.width, canvas.height);
   const code = jsQR(ctx.getImageData(0, 0, canvas.width, canvas.height).data, canvas.width, canvas.height);
@@ -66,6 +69,7 @@ async function webScanQr() {
   await loadJsQr();
   const dlg = $('scan-dialog');
   const video = $('scan-video');
+  const preview = $('scan-preview');
   const msg = $('scan-msg');
   const photo = $('scan-photo');
   let stream = null;
@@ -78,6 +82,7 @@ async function webScanQr() {
       cancelAnimationFrame(raf);
       if (stream) stream.getTracks().forEach((t) => t.stop());
       video.srcObject = null;
+      preview.onclick = null;
       photo.onchange = null;
       if (dlg.open) dlg.close();
       resolve(value);
@@ -99,29 +104,36 @@ async function webScanQr() {
       img.src = url;
     };
     msg.textContent = 'กำลังเปิดกล้อง… ถ้ากล้องไม่ขึ้น กดปุ่ม "ถ่ายรูป QR code แทน" ด้านล่าง';
-    video.hidden = true;
+    preview.hidden = true;
     dlg.showModal();
 
     const tick = () => {
       if (done) return;
-      if (video.readyState >= 2) {
-        const value = readQr(video, video.videoWidth, video.videoHeight, 640);
+      if (video.readyState >= 2 && video.videoWidth) {
+        const value = readQr(video, video.videoWidth, video.videoHeight, 640, preview);
         if (value) return finish(value);
       }
       raf = requestAnimationFrame(tick);
     };
+    // iPhone/LINE: วิดีโอต้อง muted + playsinline และอาจไม่ยอมเล่นเองเพราะเปิดหลังกดอนุญาต (ไม่ใช่จากการแตะ) → ให้แตะที่ภาพเพื่อเริ่ม
+    const play = () => video.play().then(
+      () => { msg.textContent = 'หันกล้องไปที่ QR code'; },
+      () => { msg.textContent = 'แตะที่ภาพเพื่อเปิดกล้อง'; });
+    preview.onclick = play;
     Promise.resolve()
       .then(() => navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false }))
       .then((s) => {
         stream = s;
         if (done) return finish('');
+        video.muted = true;
         video.srcObject = s;
-        video.hidden = false;
-        msg.textContent = 'หันกล้องไปที่ QR code';
-        return video.play().then(tick);
+        preview.hidden = false;
+        tick();
+        return play();
       })
-      .catch(() => {
-        if (!done) msg.textContent = 'เปิดกล้องในหน้านี้ไม่ได้ กดปุ่ม "ถ่ายรูป QR code แทน" ด้านล่าง';
+      .catch((err) => {
+        // ชื่อข้อผิดพลาด (เช่น NotAllowedError = ไม่อนุญาตกล้อง) ช่วยหาสาเหตุบนเครื่องจริง
+        if (!done) msg.textContent = `เปิดกล้องในหน้านี้ไม่ได้ (${(err && err.name) || 'ไม่รองรับ'}) กดปุ่ม "ถ่ายรูป QR code แทน" ด้านล่าง`;
       });
   });
 }
