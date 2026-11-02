@@ -4,6 +4,7 @@
     <button class="back" type="button" data-go="admin"><svg data-icon="back"></svg>สำหรับผู้ดูแล</button>
   </div>
   <h1>QR ลงชื่อประชุม</h1>
+  <div id="qr-upcoming"></div>
   <div id="qr-body"></div>
 </section>
 
@@ -30,16 +31,29 @@ App.register('admin-qr', {
 
   async enter() {
     const body = $('qr-body');
+    fill($('qr-upcoming'));
     fill(body, loadingBox('กำลังโหลดการประชุม…'));
 
     let m;
+    let upcoming;
     try {
-      // หลังบ้านให้ qrKey เฉพาะประชุมที่เปิดลงชื่อวันนี้และที่ยังไม่ถึงวัน เรียงตามวันที่ → ตัวแรก = วันนี้ ถ้าไม่มีใช้ครั้งถัดไป
-      m = (await App.api('meetings')).meetings.find((x) => x.qrKey);
+      // หลังบ้านเรียงตามวันที่ และให้ qrKey เฉพาะประชุมที่เปิดลงชื่อวันนี้และที่ยังไม่ถึงวัน → ตัวแรก = วันนี้ ถ้าไม่มีใช้ครั้งถัดไป
+      const meetings = (await App.api('meetings')).meetings;
+      m = meetings.find((x) => x.qrKey);
+      upcoming = meetings.filter((x) => !x.expired && x !== m);
       if (m) await loadQrLib();
     } catch (err) {
       fill(body, errorBox(err.message));
       return;
+    }
+    // การประชุมครั้งต่อ ๆ ไป (นอกจากที่แสดง QR) แบบย่อ: วันที่ · ชื่อ
+    if (upcoming.length) {
+      fill($('qr-upcoming'),
+        h('p', { class: 'muted small', style: 'margin:0 0 4px', text: 'การประชุมที่จะมาถึง' }),
+        h('ul', { class: 'small', style: 'list-style:none;margin:0 0 16px;padding:0' },
+          upcoming.map((x) => h('li', { style: 'padding:2px 0' },
+            h('span', { class: 'muted', text: fmtDateLong(x.date) + (x.time ? ` ${x.time} น.` : '') + ' · ' }),
+            x.title))));
     }
     if (!m) {
       fill(body, h('div', { class: 'card empty' },
