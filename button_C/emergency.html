@@ -1,4 +1,4 @@
-<link rel="stylesheet" href="styles.css?v=8">
+<link rel="stylesheet" href="styles.css?v=9">
 <section id="page-emergency" hidden>
   <div class="tabs" role="tablist" aria-label="แจ้งเหตุ">
     <button type="button" role="tab" aria-controls="em-sos">แจ้งเหตุฉุกเฉิน</button>
@@ -188,7 +188,7 @@ App.register('emergency', {
 
       (CONFIG.MAP_LANDMARKS || []).forEach((l) =>
         L.circleMarker([l.lat, l.lng], { radius: 6, color: '#fff', weight: 2, fillColor: '#6b4f2a', fillOpacity: 1, interactive: false })
-          .bindTooltip(l.name, { permanent: true, direction: 'top', offset: [0, -6] }).addTo(lmap));
+          .bindTooltip(l.name, { permanent: true, direction: 'top', offset: [0, -6], className: 'landmark' }).addTo(lmap));
 
       // แถวที่ยังไม่มีพิกัดจริง แปลงจาก x,y % ของแผนผังเดิมด้วยจุดอ้างอิง 3 จุดใน config.js
       const toLL = xyToLatLng(CONFIG.MAP_REF);
